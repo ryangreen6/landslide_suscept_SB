@@ -318,9 +318,7 @@ def fig_montecito_validation(dpi: int = 200) -> None:
         logger.warning("Montecito debris flow shapefile not found — skipping figure")
         return
 
-    rf_path = config.SUSCEPTIBILITY_RF_TIF
-    ahp_path = config.SUSCEPTIBILITY_AHP_TIF
-    src_path = rf_path if rf_path.exists() else ahp_path
+    src_path = config.SUSCEPTIBILITY_RF_TIF
     if not src_path.exists():
         logger.warning("No susceptibility output found — skipping Montecito figure")
         return
@@ -356,7 +354,7 @@ def fig_montecito_validation(dpi: int = 200) -> None:
                                  label="Thomas Fire perimeter (2017)")
 
     ax.set_xlim(xlim); ax.set_ylim(ylim)
-    model_label = "RF" if rf_path.exists() else "AHP"
+    model_label = "RF"
     ax.set_title(
         f"Montecito Validation — {model_label} Susceptibility\n"
         "January 9, 2018 Debris Flow Extent",
@@ -415,9 +413,16 @@ def build_interactive_map() -> None:
 
     logger.info("Building interactive Folium map …")
 
-    # Centre on Santa Barbara County
-    centre = [34.55, -120.0]
-    m = folium.Map(location=centre, zoom_start=9, tiles="OpenStreetMap")
+    # SB County mainland bounds — excludes Channel Islands (~33.9–34.1°N)
+    MAINLAND_BOUNDS = [[34.3, -120.7], [35.15, -119.3]]
+    centre = [34.75, -120.0]
+    m = folium.Map(location=centre, zoom_start=10, tiles="OpenStreetMap",
+                   min_zoom=9)
+    m.fit_bounds(MAINLAND_BOUNDS)
+    m.get_root().html.add_child(folium.Element(
+        f"<script>document.addEventListener('DOMContentLoaded',function(){{"
+        f"map_{m._id}.setMaxBounds([[34.1,-121.1],[35.35,-119.0]]);}});</script>"
+    ))
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/"
               "World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -439,8 +444,9 @@ def build_interactive_map() -> None:
 
         with rasterio.open(tif_path) as src:
             mb = transform_bounds(src.crs, _CRS.from_epsg(4326), *src.bounds)
-        out_h = max(1, int(512 * (mb[3] - mb[1]) / (mb[2] - mb[0])))
-        out_w = 512
+        out_w = 1024
+        lat_scale = np.cos(np.radians((mb[1] + mb[3]) / 2))
+        out_h = max(1, int(out_w * (mb[3] - mb[1]) / ((mb[2] - mb[0]) * lat_scale)))
         dst = np.full((out_h, out_w), np.nan, dtype=np.float32)
         with rasterio.open(tif_path) as src:
             _reproject(
@@ -470,7 +476,7 @@ def build_interactive_map() -> None:
         logger.info("  Added raster overlay: %s", layer_name)
 
     _raster_to_overlay(config.SUSCEPTIBILITY_RF_TIF,
-                       "RF Susceptibility (5-class)", SUSC_CMAP, SUSC_NORM)
+                       "RF Susceptibility (5-class)", SUSC_CMAP, SUSC_NORM, opacity=0.55)
 
     # ── Vector layers ─────────────────────────────────────────────────────────
     def _add_vector(shp_path, layer_name, style_fn, show=True):
@@ -515,7 +521,7 @@ def build_interactive_map() -> None:
                 folium.GeoJson(
                     row.geometry.__geo_interface__,
                     style_function=lambda _: {"color": "darkorange", "weight": 2.5,
-                                              "fillColor": "orange", "fillOpacity": 0.15},
+                                              "fillColor": "orange", "fillOpacity": 0.55},
                     tooltip="Thomas Fire (December 2017)",
                 ).add_to(grp)
             grp.add_to(m)
@@ -530,7 +536,7 @@ def build_interactive_map() -> None:
             folium.GeoJson(
                 row.geometry.__geo_interface__,
                 style_function=lambda _: {"color": "red", "weight": 3,
-                                          "fillColor": "red", "fillOpacity": 0.2},
+                                          "fillColor": "red", "fillOpacity": 0.55},
                 tooltip="January 9, 2018 Montecito Debris Flow",
                 popup=folium.Popup(
                     "<b>Montecito Debris Flow</b><br>"
@@ -552,7 +558,7 @@ def build_interactive_map() -> None:
             ls_type = str(row.get("type", row.get("Type", row.get("LSTYPE", "Unknown"))))
             folium.CircleMarker(
                 location=[lat, lon], radius=4,
-                color="darkred", fill=True, fill_color="red", fill_opacity=0.8,
+                color="darkred", fill=True, fill_color="red", fill_opacity=0.55,
                 popup=folium.Popup(
                     f"<b>Landslide</b><br>Date: {date}<br>Type: {ls_type}",
                     max_width=200,
