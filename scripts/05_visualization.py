@@ -539,33 +539,18 @@ def build_interactive_map() -> None:
             factor_b64s[_fname] = base64.b64encode(_fu8.tobytes()).decode()
         logger.info("  Factor lookup grids generated (%d factors)", len(factor_b64s))
 
-    # ── Geology lookup for address search ─────────────────────────────────────
-    geo_b64 = None
-    geo_cat_js_map = "{}"
-    if risk_bounds:
-        from rasterio.features import rasterize as _rasterize
-        from rasterio.transform import from_bounds as _fb3
-        geo_shp = config.PROCESSED_DIR / "geology_utm.shp"
-        if geo_shp.exists():
-            _geo = gpd.read_file(geo_shp).to_crs("EPSG:4326")
-            _geo_cats = sorted(_geo["GENERALIZE"].dropna().unique())
-            _geo_int = {cat: i + 1 for i, cat in enumerate(_geo_cats)}
-            _gw, _gh = 256, 256
-            _geo_shapes = [
-                (row.geometry, _geo_int.get(row["GENERALIZE"], 0))
-                for _, row in _geo.iterrows()
-                if row.geometry is not None and not row.geometry.is_empty
-            ]
-            _geo_arr = _rasterize(
-                _geo_shapes, out_shape=(_gh, _gw),
-                transform=_fb3(*risk_bounds, _gw, _gh),
-                fill=0, dtype=np.uint8,
-            )
-            geo_b64 = base64.b64encode(_geo_arr.tobytes()).decode()
-            geo_cat_js_map = "{" + ",".join(
-                f"{v}:'{k}'" for k, v in _geo_int.items()
-            ) + "}"
-            logger.info("  Geology lookup grid generated")
+    # ── Geology layer colors (USGS SGMC) ─────────────────────────────────────
+    GEO_COLORS = {
+        "Sedimentary, clastic":                     "#c2a05a",
+        "Unconsolidated, undifferentiated":          "#e8d5a3",
+        "Igneous, volcanic":                         "#c1440e",
+        "Metamorphic, serpentinite":                "#4f7942",
+        "Water":                                    "#4a90d9",
+        "Metamorphic, volcanic":                    "#8b7355",
+        "Igneous, intrusive":                       "#7b2d8b",
+        "Metamorphic, undifferentiated":             "#6b8e23",
+        "Igneous and Metamorphic, undifferentiated": "#a0522d",
+    }
 
     # ── Vector layers ─────────────────────────────────────────────────────────
     # County boundary
@@ -614,18 +599,7 @@ def build_interactive_map() -> None:
         grp.add_to(m)
         logger.info("  Added fault lines layer")
 
-    # Geology
-    GEO_COLORS = {
-        "Sedimentary, clastic":                    "#c2a05a",
-        "Unconsolidated, undifferentiated":         "#e8d5a3",
-        "Igneous, volcanic":                        "#c1440e",
-        "Metamorphic, serpentinite":               "#4f7942",
-        "Water":                                   "#4a90d9",
-        "Metamorphic, volcanic":                   "#8b7355",
-        "Igneous, intrusive":                      "#7b2d8b",
-        "Metamorphic, undifferentiated":            "#6b8e23",
-        "Igneous and Metamorphic, undifferentiated":"#a0522d",
-    }
+    # Geology (local SGMC shapefile)
     geo_shp = config.PROCESSED_DIR / "geology_utm.shp"
     if geo_shp.exists():
         geo_gdf = gpd.read_file(geo_shp).to_crs("EPSG:4326")
@@ -718,11 +692,12 @@ def build_interactive_map() -> None:
         '"Montecito 2018 Debris Flow","Geology","Landslide Inventory"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
-        f'document.addEventListener(\'DOMContentLoaded\',function(){{'
+        '_rebuildLegend();\n'
+        f'window.addEventListener(\'load\',function(){{'
         f'var mapObj=map_{m._id};'
-        'mapObj.on(\'overlayadd\',function(e){_activeLayers[e.name]=true;_rebuildLegend();});'
+        'mapObj.on(\'overlayadd\',function(e){_activeLayers[e.name]=true;_rebuildLegend();if(e.name===\'Geology\')e.layer.bringToFront();});'
         'mapObj.on(\'overlayremove\',function(e){_activeLayers[e.name]=false;_rebuildLegend();});'
-        '_rebuildLegend();}});\n</script>'
+        '}});\n</script>'
     )
     m.get_root().html.add_child(folium.Element(dynamic_legend_html))
 
@@ -771,16 +746,6 @@ def build_interactive_map() -> None:
             f"var s2=adj(top[1][1])+' '+_fn[top[1][0]];"
             f"return(s1.charAt(0).toUpperCase()+s1.slice(1))+' and '+s2+' contribute to '+rw+' at this location.';}}"
         )
-    if geo_b64:
-        risk_js += (
-            f"var _gb=new Uint8Array(atob('{geo_b64}').split('').map(function(c){{return c.charCodeAt(0);}}) );"
-            f"var _gm={geo_cat_js_map};"
-            f"function _getGeo(lat,lon){{"
-            f"var c=Math.floor((lon-_rb.w)/(_rb.e-_rb.w)*256);"
-            f"var r=Math.floor((_rb.n-lat)/(_rb.n-_rb.s)*256);"
-            f"if(c<0||c>=256||r<0||r>=256)return null;"
-            f"var v=_gb[r*256+c];return v?_gm[v]:null;}}"
-        )
     search_html = f"""
 <div id="geocoder" style="position:fixed;top:12px;left:50%;transform:translateX(-50%);
     z-index:9999;background:white;padding:8px 12px;border-radius:6px;
@@ -797,6 +762,12 @@ def build_interactive_map() -> None:
 <script>
 {risk_js}
 var _sm=null;
+function _showPin(lat,lon,name,rHtml,justHtml,geoHtml){{
+  if(_sm)map_{map_id}.removeLayer(_sm);
+  _sm=L.marker([lat,lon]).addTo(map_{map_id});
+  _sm.bindPopup('<div style="font-family:Segoe UI,sans-serif;font-size:13px;max-width:300px"><b>'+name+'</b><br><br>Landslide Risk: '+rHtml+justHtml+geoHtml+'</div>').openPopup();
+  map_{map_id}.setView([lat,lon],14);
+}}
 function _sa(){{
   var q=document.getElementById('addr-input').value.trim();
   if(!q)return;
@@ -810,14 +781,16 @@ function _sa(){{
       var risk=typeof _gr==='function'?_gr(lat,lon):0;
       var fvals=typeof _gf==='function'?_gf(lat,lon):null;
       var just=typeof _justify==='function'?_justify(fvals,risk):'';
-      var geoName=typeof _getGeo==='function'?_getGeo(lat,lon):null;
       var rHtml=risk>0?'<b style="color:'+_rc[risk]+'">'+_rl[risk]+'</b>':'Outside study area';
       var justHtml=just?'<br><span style="font-size:12px;color:#444;font-style:italic">'+just+'</span>':'';
-      var geoHtml=geoName?'<br>Geology: '+geoName:'';
-      if(_sm)map_{map_id}.removeLayer(_sm);
-      _sm=L.marker([lat,lon]).addTo(map_{map_id});
-      _sm.bindPopup('<div style="font-family:Segoe UI,sans-serif;font-size:13px;max-width:300px"><b>'+name+'</b><br><br>Landslide Risk: '+rHtml+justHtml+geoHtml+'</div>').openPopup();
-      map_{map_id}.setView([lat,lon],14);
+      fetch('https://macrostrat.org/api/geologic_units/map?lat='+lat+'&lng='+lon+'&response=long')
+        .then(function(gr){{return gr.json();}})
+        .then(function(gd){{
+          var units=(gd.success&&gd.success.data)?gd.success.data:[];
+          var geoHtml=units.length?'<br>Geology: '+units[0].name:'';
+          _showPin(lat,lon,name,rHtml,justHtml,geoHtml);
+        }})
+        .catch(function(){{_showPin(lat,lon,name,rHtml,justHtml,'');}});
     }})
     .catch(function(){{alert('Geocoding failed. Check your connection.');}});
 }}
