@@ -546,6 +546,17 @@ def build_interactive_map() -> None:
         "Metamorphic": "#4f7942",
         "Water":       "#4a90d9",
     }
+    GEO_COLORS = {
+        "Sedimentary, clastic":                     "#c2a05a",
+        "Unconsolidated, undifferentiated":          "#e8d5a3",
+        "Igneous, volcanic":                         "#c1440e",
+        "Metamorphic, serpentinite":                "#4f7942",
+        "Water":                                    "#4a90d9",
+        "Metamorphic, volcanic":                    "#8b7355",
+        "Igneous, intrusive":                       "#7b2d8b",
+        "Metamorphic, undifferentiated":             "#6b8e23",
+        "Igneous and Metamorphic, undifferentiated": "#a0522d",
+    }
 
     # ── Vector layers ─────────────────────────────────────────────────────────
     # County boundary
@@ -634,14 +645,22 @@ def build_interactive_map() -> None:
         grp = folium.FeatureGroup(name="Geology", show=False)
         for idx, (_, row) in enumerate(geo_gdf.iterrows()):
             info = _mac.get(str(idx))
-            if info and info.get("color"):
+            sgmc_cat = row.get("GENERALIZE", "")
+            mac_name = (info or {}).get("name", "")
+            # Reject Macrostrat result if it's "Landslide deposit" but SGMC says otherwise
+            # (centroid of a large polygon can land on a small incidental deposit)
+            mac_mismatch = (
+                mac_name.lower() == "landslide deposit"
+                and "landslide" not in sgmc_cat.lower()
+            )
+            if info and info.get("color") and not mac_mismatch:
                 color = info["color"]
-                tip = (info.get("name") or row.get("GENERALIZE", ""))
+                tip = mac_name or sgmc_cat
                 if info.get("lith"):
                     tip += f" ({info['lith']})"
             else:
-                color = "#aaaaaa"
-                tip = row.get("GENERALIZE", "")
+                color = GEO_COLORS.get(sgmc_cat, "#aaaaaa")
+                tip = sgmc_cat
             folium.GeoJson(
                 row.geometry.__geo_interface__,
                 style_function=lambda _, c=color: {"color": c, "weight": 0.5, "fillColor": c, "fillOpacity": 0.6},
