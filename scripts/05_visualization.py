@@ -539,17 +539,12 @@ def build_interactive_map() -> None:
             factor_b64s[_fname] = base64.b64encode(_fu8.tobytes()).decode()
         logger.info("  Factor lookup grids generated (%d factors)", len(factor_b64s))
 
-    # ── Geology layer colors (USGS SGMC) ─────────────────────────────────────
-    GEO_COLORS = {
-        "Sedimentary, clastic":                     "#c2a05a",
-        "Unconsolidated, undifferentiated":          "#e8d5a3",
-        "Igneous, volcanic":                         "#c1440e",
-        "Metamorphic, serpentinite":                "#4f7942",
-        "Water":                                    "#4a90d9",
-        "Metamorphic, volcanic":                    "#8b7355",
-        "Igneous, intrusive":                       "#7b2d8b",
-        "Metamorphic, undifferentiated":             "#6b8e23",
-        "Igneous and Metamorphic, undifferentiated": "#a0522d",
+    # ── Geology layer (Macrostrat-enhanced) ──────────────────────────────────
+    MACRO_CLASS_COLORS = {
+        "Sedimentary": "#c2a05a",
+        "Igneous":     "#c1440e",
+        "Metamorphic": "#4f7942",
+        "Water":       "#4a90d9",
     }
 
     # ── Vector layers ─────────────────────────────────────────────────────────
@@ -599,21 +594,58 @@ def build_interactive_map() -> None:
         grp.add_to(m)
         logger.info("  Added fault lines layer")
 
-    # Geology (local SGMC shapefile)
+    # Geology (SGMC polygons + Macrostrat attributes via centroid query)
     geo_shp = config.PROCESSED_DIR / "geology_utm.shp"
+    geo_cache = config.PROCESSED_DIR / "geology_macrostrat_cache.json"
     if geo_shp.exists():
+        import concurrent.futures as _cf
+        import requests as _req
         geo_gdf = gpd.read_file(geo_shp).to_crs("EPSG:4326")
+        if geo_cache.exists():
+            with open(geo_cache) as _f:
+                _mac = json.load(_f)
+            logger.info("  Macrostrat geology cache loaded (%d entries)", len(_mac))
+        else:
+            logger.info("  Fetching Macrostrat geology for %d polygons ...", len(geo_gdf))
+            def _qmac(args):
+                idx, lat, lon = args
+                try:
+                    r = _req.get(
+                        "https://macrostrat.org/api/geologic_units/map",
+                        params={"lat": lat, "lng": lon, "format": "geojson"},
+                        timeout=10,
+                    )
+                    feats = r.json().get("success", {}).get("data", {}).get("features", [])
+                    if feats:
+                        p = feats[0]["properties"]
+                        return str(idx), {"name": p.get("name", ""), "color": p.get("color", ""), "lith": p.get("lith", "")}
+                except Exception:
+                    pass
+                return str(idx), None
+            centroids = geo_gdf.geometry.centroid
+            _args = [(i, c.y, c.x) for i, c in enumerate(centroids)]
+            _mac = {}
+            with _cf.ThreadPoolExecutor(max_workers=10) as ex:
+                for k, v in ex.map(_qmac, _args):
+                    _mac[k] = v
+            with open(geo_cache, "w") as _f:
+                json.dump(_mac, _f)
+            logger.info("  Macrostrat geology cache built")
         grp = folium.FeatureGroup(name="Geology", show=False)
-        for _, row in geo_gdf.iterrows():
-            cat = row.get("GENERALIZE", "")
-            color = GEO_COLORS.get(cat, "#aaaaaa")
+        for idx, (_, row) in enumerate(geo_gdf.iterrows()):
+            info = _mac.get(str(idx))
+            if info and info.get("color"):
+                color = info["color"]
+                tip = (info.get("name") or row.get("GENERALIZE", ""))
+                if info.get("lith"):
+                    tip += f" ({info['lith']})"
+            else:
+                color = "#aaaaaa"
+                tip = row.get("GENERALIZE", "")
             folium.GeoJson(
                 row.geometry.__geo_interface__,
-                style_function=lambda _, c=color: {
-                    "color": c, "weight": 0.5,
-                    "fillColor": c, "fillOpacity": 0.6,
-                },
-                tooltip=cat,
+                style_function=lambda _, c=color: {"color": c, "weight": 0.5, "fillColor": c, "fillOpacity": 0.6},
+                tooltip=tip,
             ).add_to(grp)
         grp.add_to(m)
         logger.info("  Added geology layer (%d features)", len(geo_gdf))
@@ -668,8 +700,8 @@ def build_interactive_map() -> None:
     )
     geo_rows_flat = "".join(
         f'<span style="background:{color};display:inline-block;width:14px;height:14px;'
-        f'margin-right:4px;border:1px solid #999;vertical-align:middle;"></span>{cat}<br>'
-        for cat, color in GEO_COLORS.items()
+        f'margin-right:4px;border:1px solid #999;vertical-align:middle;"></span>{cls}<br>'
+        for cls, color in MACRO_CLASS_COLORS.items()
     )
     _leg_sections = {
         "Landslide Risk": f'<b style="font-size:14px">Landslide Risk</b><br>{risk_rows_flat}',
