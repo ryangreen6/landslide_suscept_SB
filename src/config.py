@@ -91,16 +91,15 @@ WLC_BREAKS = [0.0, 0.15, 0.24, 0.30, 0.38, 1.0]
 
 # ── WLC Factor Weights (sum = 1.0) ────────────────────────────────────────────
 WLC_WEIGHTS = {
-    "slope":          0.26,
+    "slope":          0.28,
     "curvature":      0.03,
     "twi":            0.12,
-    "lithology":      0.16,
+    "lithology":      0.18,
     "landcover":      0.08,
     "fault_distance": 0.12,
     "rainfall":       0.03,
     "ndvi":           0.08,
     "soil":           0.08,
-    "road_distance":  0.08,
 }
 
 INTERACTIVE_HTML  = OUTPUTS_DIR / "susceptibility_interactive.html"
@@ -235,5 +234,5 @@ FEATURE_COLS = [
     "slope", "curvature", "twi",
     "lithology", "landcover",
     "fault_distance", "rainfall",
-    "ndvi", "soil", "road_distance",
+    "ndvi", "soil",
 ]

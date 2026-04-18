@@ -8,24 +8,23 @@
     1.0
   ],
   "wlc_weights": {
-    "slope": 0.26,
+    "slope": 0.28,
     "curvature": 0.03,
     "twi": 0.12,
-    "lithology": 0.16,
+    "lithology": 0.18,
     "landcover": 0.08,
     "fault_distance": 0.12,
     "rainfall": 0.03,
     "ndvi": 0.08,
-    "soil": 0.08,
-    "road_distance": 0.08
+    "soil": 0.08
   },
   "montecito_validation": {
     "wlc": {
       "Very Low": 0.0,
-      "Low": 0.0,
-      "Moderate": 1.83,
-      "High": 63.27,
-      "Very High": 34.89
+      "Low": 0.06,
+      "Moderate": 20.81,
+      "High": 73.13,
+      "Very High": 6.0
     }
   }
 }
