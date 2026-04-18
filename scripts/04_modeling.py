@@ -105,9 +105,12 @@ def run_wlc_model(
         logger.info("  WLC masked to county boundary")
 
     if config.DEM_10M_TIF.exists():
+        from scipy.ndimage import binary_closing
         dem, _ = utils.read_raster(config.DEM_10M_TIF)
-        wlc = np.where((dem > 0) & np.isfinite(dem), wlc, np.nan)
-        logger.info("  WLC masked to land (DEM > 0)")
+        land = (dem > 0) & np.isfinite(dem)
+        land = binary_closing(land, structure=np.ones((9, 9)))
+        wlc = np.where(land, wlc, np.nan)
+        logger.info("  WLC masked to land (DEM > 0, smoothed)")
 
     wlc_classified = utils.reclassify_fixed(wlc, config.WLC_BREAKS)
     logger.info("  WLC fixed breaks: %s", config.WLC_BREAKS)

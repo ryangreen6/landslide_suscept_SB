@@ -22,6 +22,7 @@ import pandas as pd
 import rasterio
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import config, utils
@@ -54,12 +55,12 @@ def build_interactive_map() -> None:
         f"<script>document.addEventListener('DOMContentLoaded',function(){{"
         f"map_{m._id}.setMaxBounds([[33.3,-121.2],[35.35,-118.8]]);}});</script>"
     ))
+    folium.TileLayer(tiles="OpenStreetMap", name="OpenStreetMap").add_to(m)
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/"
               "World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attr="Esri World Imagery", name="Satellite",
     ).add_to(m)
-    folium.TileLayer(tiles="OpenStreetMap", name="OpenStreetMap").add_to(m)
 
     def _raster_to_overlay(tif_path, layer_name, cmap, norm, opacity=0.7, show=True):
         if not tif_path.exists():
@@ -105,6 +106,23 @@ def build_interactive_map() -> None:
 
     _raster_to_overlay(config.SUSCEPTIBILITY_WLC_TIF,
                        "Landslide Risk", SUSC_CMAP, SUSC_NORM, opacity=0.55)
+
+    _norm01 = mcolors.Normalize(0, 1)
+    _factor_overlays = [
+        (config.NORM_SLOPE_TIF,     "Factor: Slope",           "YlOrRd"),
+        (config.NORM_TWI_TIF,       "Factor: TWI",             "Blues"),
+        (config.NORM_CURVATURE_TIF, "Factor: Curvature",       "RdBu_r"),
+        (config.NORM_LITHOLOGY_TIF, "Factor: Lithology Risk",  "OrRd"),
+        (config.NORM_LANDCOVER_TIF, "Factor: Land Cover Risk", "YlGn_r"),
+        (config.NORM_FAULT_TIF,     "Factor: Fault Distance",  "Purples"),
+        (config.NORM_PRECIP_TIF,    "Factor: Precipitation",   "PuBu"),
+        (config.NORM_NDVI_TIF,      "Factor: NDVI",            "RdYlGn_r"),
+        (config.NORM_SOIL_TIF,      "Factor: Soil Erodibility","copper"),
+    ]
+    for _fpath, _fname, _fcmap in _factor_overlays:
+        _raster_to_overlay(_fpath, _fname,
+                           plt.get_cmap(_fcmap), _norm01,
+                           opacity=0.6, show=False)
 
     risk_bounds = None
     risk_b64 = None
