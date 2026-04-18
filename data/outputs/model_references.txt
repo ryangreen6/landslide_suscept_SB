@@ -1,0 +1,51 @@
+Landslide Susceptibility Model — Key References
+================================================
+
+Weighted Linear Combination (WLC) Factor Weights
+-------------------------------------------------
+Slope: 0.30 | Lithology: 0.20 | TWI: 0.15 | Fault Distance: 0.12
+Land Cover: 0.10 | Fire History: 0.08 | Curvature: 0.03 | Precipitation: 0.02
+
+These weights are synthesized from the sources below. Slope and lithology as
+dominant controls are consistent across studies. Fire history weight reflects
+the post-fire debris flow context of the 2018 Montecito event.
+
+Primary Sources
+---------------
+Dai, F.C. & Lee, C.F. (2002). Landslide characteristics and slope instability
+  modeling using GIS, Lantau Island, Hong Kong. Geomorphology, 42(3-4), 213-228.
+  — Establishes slope as the primary control in terrain-based susceptibility models.
+
+Ayalew, L. & Yamagishi, H. (2005). The application of GIS-based logistic
+  regression for landslide susceptibility mapping in the Kakuda-Yahiko Mountains,
+  Central Japan. Geomorphology, 65(1-2), 15-31.
+  — Widely cited weight derivations for GIS-based overlay approaches.
+
+Saha, A.K., Gupta, R.P., Sarkar, I., Arora, M.K., & Csaplovics, E. (2005).
+  An approach for GIS-based statistical landslide susceptibility zonation with a
+  case study in the Himalayas. Landslides, 2(1), 61-69.
+  — AHP-based weighting framework used as a structural template.
+
+Pradhan, B. & Lee, S. (2010). Landslide susceptibility assessment and factor
+  effect analysis: backpropagation artificial neural networks and their comparison
+  with frequency ratio and bivariate logistic regression modelling.
+  Environmental Modelling & Software, 25(6), 747-759.
+  — Compares weighted overlay and ML approaches; informs relative factor rankings.
+
+Regional / Post-Montecito Sources
+----------------------------------
+Kean, J.W., Staley, D.M., Lancaster, J.T., Rengers, F.K., Swanson, B.J.,
+  Coe, J.A., Hernandez, J.L., Sigman, A.J., Allstadt, K.E., & Lindsay, D.N.
+  (2019). Inundation, flow dynamics, and damage in the 9 January 2018 Montecito
+  debris-flow event, California, USA. Geosphere, 15(4), 1140-1163.
+  — Primary source for Montecito debris flow dynamics and contributing factors.
+
+USGS Open-File Report 2018-1001: Post-fire debris-flow hazard assessment for
+  the area burned by the 2017 Thomas Fire in Ventura and Santa Barbara Counties,
+  California. Staley et al. (2018).
+  — Quantifies slope-fire interaction in this specific terrain; informs fire
+    history weighting relative to other factors.
+
+USGS Open-File Report 2019-1015: Preliminary assessment of the debris-flow
+  hazards following the 2018 Holy Fire in the San Gabriel Mountains, California.
+  — Companion report, same methodology, cross-validates Thomas Fire approach.
