@@ -383,44 +383,29 @@ def reclassify_by_breaks(
     return result
 
 
-def reclassify_jenks(
+def reclassify_fixed(
     arr: np.ndarray,
-    n_classes: int = 5,
-) -> tuple[np.ndarray, list[float]]:
-    """Classify a continuous array into N classes using Jenks Natural Breaks.
+    breaks: list[float],
+) -> np.ndarray:
+    """Classify a continuous array using fixed break values.
 
     Args:
-        arr: Input 2-D float array (may contain NaN).
-        n_classes: Number of output classes.
+        arr: Input 2-D float array (may contain NaN/NODATA).
+        breaks: Monotonically increasing list of N+1 boundary values defining N classes.
 
     Returns:
-        Tuple of (classified integer array, list of break values).
-
-    Raises:
-        ImportError: If ``jenkspy`` is not installed.
+        Classified float32 array with values 1..N and NODATA where arr is invalid.
     """
-    try:
-        import jenkspy
-    except ImportError:
-        raise ImportError("jenkspy is required: pip install jenkspy")
-
-    finite_vals = arr[np.isfinite(arr)].flatten()
-    # Subsample for performance — Jenks on >100k values is very slow
-    max_samples = 100_000
-    if len(finite_vals) > max_samples:
-        rng = np.random.default_rng(42)
-        finite_vals = rng.choice(finite_vals, size=max_samples, replace=False)
-    breaks = jenkspy.jenks_breaks(finite_vals.tolist(), n_classes=n_classes)
+    n_classes = len(breaks) - 1
     classified = np.full(arr.shape, config.NODATA, dtype=np.float32)
     for i in range(n_classes):
-        low  = breaks[i]
-        high = breaks[i + 1]
+        low, high = breaks[i], breaks[i + 1]
         if i == 0:
             mask = (arr >= low) & (arr <= high)
         else:
             mask = (arr > low) & (arr <= high)
         classified = np.where(mask & np.isfinite(arr), float(i + 1), classified)
-    return classified, breaks
+    return classified
 
 
 # ── Rasterisation ─────────────────────────────────────────────────────────────

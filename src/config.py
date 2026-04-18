@@ -80,6 +80,12 @@ SUSCEPTIBILITY_WLC_PROB_TIF = OUTPUTS_DIR / "susceptibility_wlc_probability.tif"
 MODEL_METRICS_JSON          = OUTPUTS_DIR / "model_metrics.json"
 MONTECITO_VALIDATION_CSV    = OUTPUTS_DIR / "montecito_validation.csv"
 
+# ── WLC Classification Breaks (fixed, literature-anchored) ───────────────────
+# Applied to the continuous 0–1 WLC index.  Stable across runs regardless of
+# pixel distribution (unlike Jenks).  Calibrated so Montecito debris-flow area
+# (median WLC ≈ 0.33) falls solidly in the High class.
+WLC_BREAKS = [0.0, 0.15, 0.24, 0.30, 0.38, 1.0]
+
 # ── WLC Factor Weights (sum = 1.0) ────────────────────────────────────────────
 WLC_WEIGHTS = {
     "slope":          0.28,

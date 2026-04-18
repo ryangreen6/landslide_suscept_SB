@@ -88,9 +88,25 @@ def run_wlc_model(
         wlc = wlc / weight_used
 
     wlc = np.where(np.isfinite(wlc), np.clip(wlc, 0.0, 1.0), np.nan).astype(np.float32)
-    wlc_classified, wlc_breaks = utils.reclassify_jenks(wlc, n_classes=5)
-    logger.info("  WLC Jenks breaks: %s", [round(b, 4) for b in wlc_breaks])
-    return wlc, wlc_classified, wlc_breaks
+
+    if config.COUNTY_UTM_SHP.exists():
+        import tempfile, os
+        from rasterio.mask import mask as rio_mask
+        from shapely.geometry import mapping as geo_mapping
+        county = gpd.read_file(config.COUNTY_UTM_SHP)
+        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
+            tmp_path = tmp.name
+        utils.write_raster(wlc, profile.copy(), tmp_path)
+        with rasterio.open(tmp_path) as src:
+            geoms = [geo_mapping(g) for g in county.geometry]
+            masked, _ = rio_mask(src, geoms, crop=False, nodata=np.nan, filled=True)
+        wlc = masked[0].astype(np.float32)
+        os.unlink(tmp_path)
+        logger.info("  WLC masked to county boundary")
+
+    wlc_classified = utils.reclassify_fixed(wlc, config.WLC_BREAKS)
+    logger.info("  WLC fixed breaks: %s", config.WLC_BREAKS)
+    return wlc, wlc_classified, config.WLC_BREAKS
 
 
 # ── Montecito Validation ──────────────────────────────────────────────────────
