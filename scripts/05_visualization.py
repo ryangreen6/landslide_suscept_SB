@@ -107,22 +107,9 @@ def build_interactive_map() -> None:
     _raster_to_overlay(config.SUSCEPTIBILITY_WLC_TIF,
                        "Landslide Risk", SUSC_CMAP, SUSC_NORM, opacity=0.55)
 
-    _norm01 = mcolors.Normalize(0, 1)
-    _factor_overlays = [
-        (config.NORM_SLOPE_TIF,     "Factor: Slope",           "YlOrRd"),
-        (config.NORM_TWI_TIF,       "Factor: TWI",             "Blues"),
-        (config.NORM_CURVATURE_TIF, "Factor: Curvature",       "RdBu_r"),
-        (config.NORM_LITHOLOGY_TIF, "Factor: Lithology Risk",  "OrRd"),
-        (config.NORM_LANDCOVER_TIF, "Factor: Land Cover Risk", "YlGn_r"),
-        (config.NORM_FAULT_TIF,     "Factor: Fault Distance",  "Purples"),
-        (config.NORM_PRECIP_TIF,    "Factor: Precipitation",   "PuBu"),
-        (config.NORM_NDVI_TIF,      "Factor: NDVI",            "RdYlGn_r"),
-        (config.NORM_SOIL_TIF,      "Factor: Soil Erodibility","copper"),
-    ]
-    for _fpath, _fname, _fcmap in _factor_overlays:
-        _raster_to_overlay(_fpath, _fname,
-                           plt.get_cmap(_fcmap), _norm01,
-                           opacity=0.6, show=False)
+    _raster_to_overlay(config.NORM_SOIL_TIF, "Soil Erodibility",
+                       plt.get_cmap("copper"), mcolors.Normalize(0, 1),
+                       opacity=0.6, show=False)
 
     risk_bounds = None
     risk_b64 = None
@@ -362,6 +349,7 @@ def build_interactive_map() -> None:
         "Montecito 2018 Debris Flow": '<span style="background:red;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;opacity:0.7;"></span>Montecito 2018 Debris Flow<br>',
         "Geology": f'<hr style="margin:4px 0"><b>Geology</b><br>{geo_rows_flat}',
         "Landslide Inventory": '<span style="display:inline-block;width:10px;height:10px;background:red;border-radius:50%;margin-right:4px;border:1px solid #900;vertical-align:middle;"></span>Landslide Inventory<br>',
+        "Soil Erodibility": '<hr style="margin:4px 0"><b>Soil Erodibility</b><br><span style="font-size:11px;color:#555">Low \u2192 High (copper scale)</span><br>',
     }
     legend_sections_js = "var _legendSections=" + json.dumps(_leg_sections) + ";"
     dynamic_legend_html = (
@@ -372,7 +360,7 @@ def build_interactive_map() -> None:
         f'<script>\n{legend_sections_js}\n'
         f'var _activeLayers={{"Landslide Risk":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
-        'var order=["Landslide Risk","Fire Perimeters (2016\u2013Present)","Fault Lines",'
+        'var order=["Landslide Risk","Soil Erodibility","Fire Perimeters (2016\u2013Present)","Fault Lines",'
         '"Montecito 2018 Debris Flow","Geology","Landslide Inventory"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'

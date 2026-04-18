@@ -105,10 +105,19 @@ def run_wlc_model(
         logger.info("  WLC masked to county boundary")
 
     if config.DEM_10M_TIF.exists():
-        from scipy.ndimage import binary_closing
-        dem, _ = utils.read_raster(config.DEM_10M_TIF)
-        land = (dem > 0) & np.isfinite(dem)
-        land = binary_closing(land, structure=np.ones((9, 9)))
+        land_mask_tif = config.PROCESSED_DIR / "land_mask_smoothed.tif"
+        if land_mask_tif.exists():
+            land_arr, _ = utils.read_raster(land_mask_tif)
+            land = land_arr > 0
+            logger.info("  Land mask loaded from cache")
+        else:
+            from scipy.ndimage import binary_closing
+            dem, dem_profile = utils.read_raster(config.DEM_10M_TIF)
+            land = (dem > 0) & np.isfinite(dem)
+            logger.info("  Computing smoothed land mask (51x51 closing) — this takes ~10 min, cached after …")
+            land = binary_closing(land, structure=np.ones((51, 51)))
+            utils.write_raster(land.astype(np.float32), dem_profile, land_mask_tif)
+            logger.info("  Land mask cached → %s", land_mask_tif)
         wlc = np.where(land, wlc, np.nan)
         logger.info("  WLC masked to land (DEM > 0, smoothed)")
 
