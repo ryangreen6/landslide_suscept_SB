@@ -502,6 +502,26 @@ def build_soil_risk(ref_path: Path) -> None:
     logger.info("  Soil erodibility risk saved → %s", config.SOIL_RISK_TIF)
 
 
+# ── Factor: Road Distance ─────────────────────────────────────────────────────
+
+def build_road_distance_risk(ref_path: Path) -> None:
+    if not _check_required([config.ROADS_SHP], "Roads shapefile"):
+        logger.warning("Road distance layer skipped — assigning risk 1 everywhere")
+        dem, profile = utils.read_raster(ref_path)
+        default = np.where(np.isfinite(dem), 1.0, np.nan)
+        utils.write_raster(default.astype(np.float32), profile, config.ROAD_DIST_RISK_TIF)
+        return
+
+    logger.info("Building road distance risk layer …")
+    roads = gpd.read_file(config.ROADS_SHP).to_crs(config.CRS_ANALYSIS)
+    dist_arr = utils.euclidean_distance_raster(roads, ref_path)
+    risk_arr = utils.reclassify_by_breaks(dist_arr, config.ROAD_DISTANCE_BREAKS)
+    dem, profile = utils.read_raster(ref_path)
+    risk_arr = np.where(np.isfinite(dem), risk_arr, np.nan)
+    utils.write_raster(risk_arr.astype(np.float32), profile, config.ROAD_DIST_RISK_TIF)
+    logger.info("  Road distance risk saved → %s", config.ROAD_DIST_RISK_TIF)
+
+
 # ── Normalise All Layers ──────────────────────────────────────────────────────
 
 def normalise_all_layers() -> None:
@@ -512,6 +532,7 @@ def normalise_all_layers() -> None:
         (config.LITHOLOGY_RISK_TIF, config.NORM_LITHOLOGY_TIF, True),
         (config.LANDCOVER_RISK_TIF, config.NORM_LANDCOVER_TIF, True),
         (config.FAULT_DIST_RISK_TIF, config.NORM_FAULT_TIF,    True),
+        (config.ROAD_DIST_RISK_TIF,  config.NORM_ROAD_TIF,     True),
         (config.PRECIP_NORM_TIF,    config.NORM_PRECIP_TIF,    False),
         (config.SOIL_RISK_TIF,      config.NORM_SOIL_TIF,      True),
         (config.TWI_TIF,            config.NORM_TWI_TIF,       False),
@@ -576,6 +597,7 @@ def main() -> None:
     build_lithology_risk(ref_path)
     build_landcover_risk(ref_path)
     build_fault_distance_risk(ref_path)
+    build_road_distance_risk(ref_path)
     build_precipitation_layer(ref_path)
     build_ndvi_layer(ref_path)
     build_soil_risk(ref_path)
@@ -585,7 +607,7 @@ def main() -> None:
         config.NORM_SLOPE_TIF, config.NORM_CURVATURE_TIF, config.NORM_TWI_TIF,
         config.NORM_LITHOLOGY_TIF, config.NORM_LANDCOVER_TIF,
         config.NORM_FAULT_TIF, config.NORM_PRECIP_TIF,
-        config.NORM_NDVI_TIF, config.NORM_SOIL_TIF,
+        config.NORM_NDVI_TIF, config.NORM_SOIL_TIF, config.NORM_ROAD_TIF,
     ]
     missing = [p for p in expected if not p.exists()]
     if missing:

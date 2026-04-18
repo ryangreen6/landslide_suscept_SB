@@ -186,6 +186,7 @@ def main() -> None:
         config.NORM_PRECIP_TIF,
         config.NORM_NDVI_TIF,
         config.NORM_SOIL_TIF,
+        config.NORM_ROAD_TIF,
     ]
     feature_names = config.FEATURE_COLS
 

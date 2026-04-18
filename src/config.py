@@ -32,6 +32,7 @@ COUNTY_BOUNDARY_SHP     = RAW_DIR / "sb_county_boundary" / "sb_county_boundary.s
 DEM_TILES_DIR           = RAW_DIR / "dem_tiles"                  # 1/3 arc-sec 3DEP tiles
 DEM_MOSAIC_TIF          = RAW_DIR / "dem_mosaic_raw.tif"         # mosaicked DEM
 GEOLOGY_SHP             = RAW_DIR / "ca_geology" / "ca_geology.shp"
+ROADS_SHP               = RAW_DIR / "tl_2025_06083_roads" / "tl_2025_06083_roads.shp"
 NLCD_TIF                = RAW_DIR / "nlcd_2021" / "nlcd_2021_lcmap.tif"   # USGS LCMAP 2021
 LANDSLIDE_INVENTORY_SHP = RAW_DIR / "landslide_inventory" / "ls_inventory.shp"
 FAULT_LINES_SHP         = RAW_DIR / "quaternary_faults" / "qfaults.shp"
@@ -54,6 +55,7 @@ LITHOLOGY_RISK_TIF  = PROCESSED_DIR / "lithology_risk.tif"
 LANDCOVER_RISK_TIF  = PROCESSED_DIR / "landcover_risk.tif"
 GAP_TIF             = PROCESSED_DIR / "gap_landcover_utm.tif"
 FAULT_DIST_RISK_TIF = PROCESSED_DIR / "fault_distance_risk.tif"
+ROAD_DIST_RISK_TIF  = PROCESSED_DIR / "road_distance_risk.tif"
 PRECIP_NORM_TIF     = PROCESSED_DIR / "precipitation_normalized.tif"
 ATLAS14_UTM_TIF     = PROCESSED_DIR / "atlas14_100yr24h_utm.tif"
 NDVI_TIF            = PROCESSED_DIR / "ndvi_median.tif"
@@ -66,6 +68,7 @@ NORM_TWI_TIF       = PROCESSED_DIR / "norm_twi.tif"
 NORM_LITHOLOGY_TIF = PROCESSED_DIR / "norm_lithology.tif"
 NORM_LANDCOVER_TIF = PROCESSED_DIR / "norm_landcover.tif"
 NORM_FAULT_TIF     = PROCESSED_DIR / "norm_fault_distance.tif"
+NORM_ROAD_TIF      = PROCESSED_DIR / "norm_road_distance.tif"
 NORM_PRECIP_TIF    = PROCESSED_DIR / "norm_precipitation.tif"
 NORM_NDVI_TIF      = PROCESSED_DIR / "norm_ndvi.tif"
 NORM_SOIL_TIF      = PROCESSED_DIR / "norm_soil.tif"
@@ -88,15 +91,16 @@ WLC_BREAKS = [0.0, 0.15, 0.24, 0.30, 0.38, 1.0]
 
 # ── WLC Factor Weights (sum = 1.0) ────────────────────────────────────────────
 WLC_WEIGHTS = {
-    "slope":          0.28,
+    "slope":          0.26,
     "curvature":      0.03,
     "twi":            0.12,
-    "lithology":      0.18,
+    "lithology":      0.16,
     "landcover":      0.08,
     "fault_distance": 0.12,
     "rainfall":       0.03,
     "ndvi":           0.08,
     "soil":           0.08,
+    "road_distance":  0.08,
 }
 
 INTERACTIVE_HTML  = OUTPUTS_DIR / "susceptibility_interactive.html"
@@ -207,6 +211,15 @@ GAP_RISK = {
     553: 5,     # Undifferentiated Barren Land
 }
 
+# ── Road Distance Risk Classification ────────────────────────────────────────
+ROAD_DISTANCE_BREAKS = [
+    (0,    50,   5),
+    (50,   200,  4),
+    (200,  500,  3),
+    (500,  1000, 2),
+    (1000, None, 1),
+]
+
 # ── Fault Distance Risk Classification ───────────────────────────────────────
 # List of (min_metres, max_metres_or_None, risk_score)
 FAULT_DISTANCE_BREAKS = [
@@ -222,5 +235,5 @@ FEATURE_COLS = [
     "slope", "curvature", "twi",
     "lithology", "landcover",
     "fault_distance", "rainfall",
-    "ndvi", "soil",
+    "ndvi", "soil", "road_distance",
 ]

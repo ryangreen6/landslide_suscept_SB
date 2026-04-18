@@ -357,6 +357,16 @@ def build_interactive_map() -> None:
             ).add_to(grp)
         grp.add_to(m)
 
+    if config.ROADS_SHP.exists():
+        roads_gdf = gpd.read_file(config.ROADS_SHP).to_crs("EPSG:4326")
+        grp = folium.FeatureGroup(name="Roads", show=False)
+        folium.GeoJson(
+            roads_gdf.__geo_interface__,
+            style_function=lambda _: {"color": "#C97C5D", "weight": 1.2, "fillOpacity": 0},
+        ).add_to(grp)
+        grp.add_to(m)
+        logger.info("  Added roads layer (%d segments)", len(roads_gdf))
+
     ls_shp = config.PROCESSED_DIR / "landslide_inventory_utm.shp"
     if ls_shp.exists():
         ls = gpd.read_file(ls_shp).to_crs("EPSG:4326")
@@ -395,6 +405,7 @@ def build_interactive_map() -> None:
         "Montecito 2018 Debris Flow": '<span style="background:red;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;opacity:0.7;"></span>Montecito 2018 Debris Flow<br>',
         "Geology": '<hr style="margin:4px 0"><b>Geology</b><br><span style="font-size:11px;color:#888;font-style:italic;display:block;max-width:140px;word-wrap:break-word;">Hover over an area for geological details</span><br>',
         "Historical Landslides": '<span style="display:inline-block;width:10px;height:10px;background:#ff5500;border-radius:50%;margin-right:4px;border:1px solid #cc3300;vertical-align:middle;"></span>Historical Landslides<br>',
+        "Roads": '<hr style="margin:4px 0"><span style="color:#C97C5D;font-weight:bold">\u2501\u2501</span> Roads<br>',
         "Soil Erodibility": '<hr style="margin:4px 0"><b>Soil Erodibility</b><br><span style="font-size:11px;color:#888">Low \u2192 High (copper scale)</span><br>',
         "Precipitation Intensity": '<b>Precipitation Intensity</b><br><span style="font-size:11px;color:#888">Low \u2192 High (100-yr/24-hr, blues)</span><br>',
     }
@@ -408,7 +419,7 @@ def build_interactive_map() -> None:
         f'var _activeLayers={{"Landslide Risk":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
         'var order=["Landslide Risk","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
-        '"Montecito 2018 Debris Flow","Geology","Historical Landslides"];'
+        '"Montecito 2018 Debris Flow","Geology","Historical Landslides","Roads"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
         '_rebuildLegend();\n'
@@ -549,6 +560,7 @@ function _sa(){{
     <li><b>Soil Erodibility</b> &mdash; USDA NRCS gSSURGO (K-factor &amp; hydrologic group) &mdash; <span style="color:#555;">Weight: 8%</span></li>
     <li><b>Terrain Curvature</b> &mdash; Derived from USGS 3DEP 1/3 arc-second DEM &mdash; <span style="color:#555;">Weight: 3%</span></li>
     <li><b>Precipitation</b> &mdash; NOAA Atlas 14 Vol. 1 (100-yr / 24-hr AMS) &mdash; <span style="color:#555;">Weight: 3%</span></li>
+    <li><b>Road Distance</b> &mdash; U.S. Census Bureau TIGER/Line Roads 2025 &mdash; <span style="color:#555;">Weight: 8%</span></li>
   </ul>
   <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#333;">Additional Data Sources</b>
   <ul style="margin:4px 0 0;padding-left:16px;line-height:1.85;color:#222;">
@@ -659,6 +671,7 @@ window.addEventListener('load', function() {
     'Geology': false,
     'Montecito 2018 Debris Flow': false,
     'Historical Landslides': false,
+    'Roads': false,
   };
   var ctrl = document.querySelector('.leaflet-control-layers');
   if (!ctrl) return;
