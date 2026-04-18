@@ -52,7 +52,7 @@ def build_interactive_map() -> None:
     m.fit_bounds(MAINLAND_BOUNDS)
     m.get_root().html.add_child(folium.Element(
         f"<script>document.addEventListener('DOMContentLoaded',function(){{"
-        f"map_{m._id}.setMaxBounds([[34.1,-121.1],[35.35,-119.0]]);}});</script>"
+        f"map_{m._id}.setMaxBounds([[33.3,-121.2],[35.35,-118.8]]);}});</script>"
     ))
     folium.TileLayer(
         tiles="https://server.arcgisonline.com/ArcGIS/rest/services/"
