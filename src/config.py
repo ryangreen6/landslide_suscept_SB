@@ -75,6 +75,7 @@ NORM_SOIL_TIF      = PROCESSED_DIR / "norm_soil.tif"
 
 # County boundary reprojected to analysis CRS
 COUNTY_UTM_SHP     = PROCESSED_DIR / "sb_county_utm.shp"
+USGS_LS_GPKG       = PROCESSED_DIR / "usgs_landslides_sb.gpkg"
 COUNTY_UTM_TIF     = PROCESSED_DIR / "county_mask.tif"
 
 # ── Output Files ──────────────────────────────────────────────────────────────

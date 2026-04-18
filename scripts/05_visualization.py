@@ -368,6 +368,64 @@ def build_interactive_map() -> None:
         logger.info("  Added roads layer (%d segments)", len(roads_gdf))
 
 
+    ls_gpkg = config.USGS_LS_GPKG
+    if not ls_gpkg.exists():
+        import requests as _req, json as _json
+        logger.info("  Fetching USGS landslide inventory for SB County …")
+        _base = "https://services.arcgis.com/v01gqwM5QqNysAAi/arcgis/rest/services/US_Landslide_poly_v2/FeatureServer/12"
+        _bbox = {"xmin":-120.75,"ymin":34.25,"xmax":-119.0,"ymax":35.15,"spatialReference":{"wkid":4326}}
+        _feats, _off = [], 0
+        while True:
+            _p = {"where":"1=1","geometry":_json.dumps(_bbox),"geometryType":"esriGeometryEnvelope",
+                  "inSR":4326,"spatialRel":"esriSpatialRelIntersects",
+                  "outFields":"USGS_ID,Date_Min,Date_Max,Fatalities,Confidence,LS_Type,Inventory,Info_Sourc",
+                  "outSR":4326,"f":"geojson","resultOffset":_off,"resultRecordCount":2000}
+            _batch = _req.get(_base + "/query", params=_p, timeout=30).json().get("features", [])
+            _feats.extend(_batch)
+            if len(_batch) < 2000: break
+            _off += 2000
+        _gdf = gpd.GeoDataFrame.from_features(_feats, crs="EPSG:4326")
+        _county = gpd.read_file(config.COUNTY_UTM_SHP).to_crs("EPSG:4326")
+        _gdf = gpd.clip(_gdf, _county)
+        _gdf.to_file(str(ls_gpkg), driver="GPKG")
+        logger.info("  USGS landslide inventory cached → %s", ls_gpkg)
+
+    if ls_gpkg.exists():
+        ls_gdf = gpd.read_file(str(ls_gpkg)).to_crs("EPSG:4326")
+
+        def _ls_tip(row):
+            lines = []
+            ls_type = str(row.get("LS_Type", "")).strip()
+            if ls_type and ls_type.lower() not in ("nan", "none", ""):
+                lines.append(f"<b>{ls_type.title()}</b>")
+            else:
+                lines.append("<b>Landslide</b>")
+            d_min = str(row.get("Date_Min", "")).strip()
+            d_max = str(row.get("Date_Max", "")).strip()
+            if d_min and d_min.lower() not in ("nan", "none", ""):
+                lines.append(f"Date: {d_min}" + (f" – {d_max}" if d_max and d_max != d_min and d_max.lower() not in ("nan","none","") else ""))
+            fat = row.get("Fatalities", 0)
+            if fat and int(fat) > 0:
+                lines.append(f"Fatalities: {int(fat)}")
+            conf = row.get("Confidence", "")
+            if conf and str(conf).strip().lower() not in ("nan", "none", ""):
+                lines.append(f"Confidence: {conf}")
+            src = str(row.get("Inventory", "")).strip()
+            if src and src.lower() not in ("nan", "none", ""):
+                lines.append(f"Source: {src}")
+            return "<br>".join(lines)
+
+        grp = folium.FeatureGroup(name="Historical Landslides", show=False)
+        for _, row in ls_gdf.iterrows():
+            folium.GeoJson(
+                row.geometry.__geo_interface__,
+                style_function=lambda _: {"color": "#6B3A2A", "weight": 0.5,
+                                          "fillColor": "#A0522D", "fillOpacity": 0.5},
+                tooltip=folium.Tooltip(_ls_tip(row), style="font-size:13px;"),
+            ).add_to(grp)
+        grp.add_to(m)
+        logger.info("  Added USGS landslide inventory (%d polygons)", len(ls_gdf))
+
     risk_rows_flat = "".join(
         f'<span style="background:{config.SUSCEPTIBILITY_COLORS[i]};display:inline-block;'
         f'width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;"></span>'
@@ -385,7 +443,8 @@ def build_interactive_map() -> None:
         "Fault Lines": '<span style="color:red;font-weight:bold">\u2501\u2501</span> Fault Lines<br><span style="font-size:11px;color:#888;font-style:italic;display:block;margin-top:2px;">Hover over a fault line for details</span>',
         "Montecito 2018 Debris Flow": '<span style="background:red;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;opacity:0.7;"></span>Montecito 2018 Debris Flow<br>',
         "Geology": '<hr style="margin:4px 0"><b>Geology</b><br><span style="font-size:11px;color:#888;font-style:italic;display:block;max-width:140px;word-wrap:break-word;">Hover over an area for geological details</span><br>',
-        "Roads": '<hr style="margin:4px 0"><span style="color:#C0E8F9;font-weight:bold">\u2501\u2501</span> Roads<br>',
+        "Historical Landslides": '<hr style="margin:4px 0"><span style="background:#A0522D;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #6B3A2A;vertical-align:middle;opacity:0.7;"></span>Historical Landslides<br>',
+        "Roads": '<span style="color:#C0E8F9;font-weight:bold">\u2501\u2501</span> Roads<br>',
         "Soil Erodibility": '<hr style="margin:4px 0"><b>Soil Erodibility</b><br><span style="font-size:11px;color:#888">Low \u2192 High (copper scale)</span><br>',
         "Precipitation Intensity": '<b>Precipitation Intensity</b><br><span style="font-size:11px;color:#888">Low \u2192 High (100-yr/24-hr, blues)</span><br>',
     }
@@ -399,7 +458,7 @@ def build_interactive_map() -> None:
         f'var _activeLayers={{"Landslide Risk":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
         'var order=["Landslide Risk","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
-        '"Montecito 2018 Debris Flow","Geology","Roads"];'
+        '"Montecito 2018 Debris Flow","Geology","Historical Landslides","Roads"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
         '_rebuildLegend();\n'
@@ -546,6 +605,7 @@ function _sa(){{
     <li><b>County Boundary</b> &mdash; U.S. Census Bureau TIGER/Line Shapefiles</li>
     <li><b>Fire Perimeters</b> &mdash; CAL FIRE Fire and Resource Assessment Program (FRAP)</li>
     <li><b>Montecito Debris Flow</b> &mdash; USGS / CGS 2018 Thomas Fire debris flow mapping</li>
+    <li><b>Historical Landslides</b> &mdash; USGS National Landslide Inventory v3 (polygon deposits)</li>
   </ul>
   <p style="margin:12px 0 0;font-size:11px;color:#666;text-align:center;">&copy; Ryan Green, 2026</p>
 </div>
@@ -648,6 +708,7 @@ window.addEventListener('load', function() {
     'Fault Lines': false,
     'Geology': false,
     'Montecito 2018 Debris Flow': false,
+    'Historical Landslides': false,
     'Roads': false,
   };
   var ctrl = document.querySelector('.leaflet-control-layers');
