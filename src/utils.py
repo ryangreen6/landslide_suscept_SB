@@ -70,7 +70,6 @@ def ensure_dirs() -> None:
         config.RAW_DIR,
         config.PROCESSED_DIR,
         config.OUTPUTS_DIR,
-        config.FIGURES_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 

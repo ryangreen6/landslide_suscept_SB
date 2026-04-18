@@ -25,7 +25,7 @@ DATA_DIR      = PROJECT_ROOT / "data"
 RAW_DIR       = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
 OUTPUTS_DIR   = DATA_DIR / "outputs"
-FIGURES_DIR   = OUTPUTS_DIR / "figures"
+
 
 # ── Raw Input Files (expected after manual download — see README) ─────────────
 COUNTY_BOUNDARY_SHP     = RAW_DIR / "sb_county_boundary" / "sb_county_boundary.shp"
@@ -99,11 +99,6 @@ WLC_WEIGHTS = {
     "soil":           0.08,
 }
 
-# ── Figure Outputs ────────────────────────────────────────────────────────────
-FIG_FACTORS       = FIGURES_DIR / "factor_layers_overview.png"
-FIG_COMPARISON    = FIGURES_DIR / "susceptibility_comparison.png"
-FIG_IMPORTANCE    = FIGURES_DIR / "wlc_weights.png"
-FIG_MONTECITO     = FIGURES_DIR / "montecito_validation.png"
 INTERACTIVE_HTML  = OUTPUTS_DIR / "susceptibility_interactive.html"
 
 # ── Susceptibility Class Colors & Labels ──────────────────────────────────────
