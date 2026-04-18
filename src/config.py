@@ -37,6 +37,8 @@ LANDSLIDE_INVENTORY_SHP = RAW_DIR / "landslide_inventory" / "ls_inventory.shp"
 FAULT_LINES_SHP         = RAW_DIR / "quaternary_faults" / "qfaults.shp"
 PRISM_PRECIP_TIF        = RAW_DIR / "prism" / "prism_ppt_sb_area.tif"
 FIRE_PERIMETERS_SHP     = RAW_DIR / "fire_perimeters" / "California_Fire_Perimeters_all.shp"
+GSSURGO_GDB             = RAW_DIR / "gSSURGO_CA.gdb"
+ATLAS14_ASC             = RAW_DIR / "atlas_14" / "sw100yr24ha_ams.asc"
 MONTECITO_DEBRIS_SHP    = RAW_DIR / "montecito_debris_flow" / "montecito_2018_debris_flow.shp"
 
 # ── Processed Intermediate Files ──────────────────────────────────────────────
@@ -50,36 +52,51 @@ FLOW_ACC_TIF       = PROCESSED_DIR / "flow_accumulation.tif"
 
 LITHOLOGY_RISK_TIF  = PROCESSED_DIR / "lithology_risk.tif"
 LANDCOVER_RISK_TIF  = PROCESSED_DIR / "landcover_risk.tif"
+GAP_TIF             = PROCESSED_DIR / "gap_landcover_utm.tif"
 FAULT_DIST_RISK_TIF = PROCESSED_DIR / "fault_distance_risk.tif"
 PRECIP_NORM_TIF     = PROCESSED_DIR / "precipitation_normalized.tif"
-FIRE_RISK_TIF       = PROCESSED_DIR / "fire_history_risk.tif"
+ATLAS14_UTM_TIF     = PROCESSED_DIR / "atlas14_100yr24h_utm.tif"
+NDVI_TIF            = PROCESSED_DIR / "ndvi_median.tif"
+SOIL_RISK_TIF       = PROCESSED_DIR / "soil_erodibility_risk.tif"
 
 # Normalized factor rasters (0–1), ready for modeling
 NORM_SLOPE_TIF     = PROCESSED_DIR / "norm_slope.tif"
-NORM_CURVATURE_TIF = PROCESSED_DIR / "norm_curvature.tif"   # combined profile+plan
+NORM_CURVATURE_TIF = PROCESSED_DIR / "norm_curvature.tif"
 NORM_TWI_TIF       = PROCESSED_DIR / "norm_twi.tif"
 NORM_LITHOLOGY_TIF = PROCESSED_DIR / "norm_lithology.tif"
 NORM_LANDCOVER_TIF = PROCESSED_DIR / "norm_landcover.tif"
 NORM_FAULT_TIF     = PROCESSED_DIR / "norm_fault_distance.tif"
 NORM_PRECIP_TIF    = PROCESSED_DIR / "norm_precipitation.tif"
-NORM_FIRE_TIF      = PROCESSED_DIR / "norm_fire_history.tif"
+NORM_NDVI_TIF      = PROCESSED_DIR / "norm_ndvi.tif"
+NORM_SOIL_TIF      = PROCESSED_DIR / "norm_soil.tif"
 
 # County boundary reprojected to analysis CRS
 COUNTY_UTM_SHP     = PROCESSED_DIR / "sb_county_utm.shp"
 COUNTY_UTM_TIF     = PROCESSED_DIR / "county_mask.tif"
 
 # ── Output Files ──────────────────────────────────────────────────────────────
-SUSCEPTIBILITY_RF_PROB_TIF = OUTPUTS_DIR / "susceptibility_rf_probability.tif"
-SUSCEPTIBILITY_RF_TIF      = OUTPUTS_DIR / "susceptibility_rf_classified.tif"
-TRAINING_SAMPLES_CSV       = OUTPUTS_DIR / "training_samples.csv"
-MODEL_METRICS_JSON         = OUTPUTS_DIR / "model_metrics.json"
-MONTECITO_VALIDATION_CSV   = OUTPUTS_DIR / "montecito_validation.csv"
+SUSCEPTIBILITY_WLC_TIF      = OUTPUTS_DIR / "susceptibility_wlc_classified.tif"
+SUSCEPTIBILITY_WLC_PROB_TIF = OUTPUTS_DIR / "susceptibility_wlc_probability.tif"
+MODEL_METRICS_JSON          = OUTPUTS_DIR / "model_metrics.json"
+MONTECITO_VALIDATION_CSV    = OUTPUTS_DIR / "montecito_validation.csv"
+
+# ── WLC Factor Weights (sum = 1.0) ────────────────────────────────────────────
+WLC_WEIGHTS = {
+    "slope":          0.28,
+    "curvature":      0.03,
+    "twi":            0.12,
+    "lithology":      0.18,
+    "landcover":      0.08,
+    "fault_distance": 0.12,
+    "rainfall":       0.03,
+    "ndvi":           0.08,
+    "soil":           0.08,
+}
 
 # ── Figure Outputs ────────────────────────────────────────────────────────────
 FIG_FACTORS       = FIGURES_DIR / "factor_layers_overview.png"
 FIG_COMPARISON    = FIGURES_DIR / "susceptibility_comparison.png"
-FIG_ROC           = FIGURES_DIR / "roc_curve.png"
-FIG_IMPORTANCE    = FIGURES_DIR / "feature_importance.png"
+FIG_IMPORTANCE    = FIGURES_DIR / "wlc_weights.png"
 FIG_MONTECITO     = FIGURES_DIR / "montecito_validation.png"
 INTERACTIVE_HTML  = OUTPUTS_DIR / "susceptibility_interactive.html"
 
@@ -120,19 +137,73 @@ LITHOLOGY_RISK_KEYWORDS = {
 }
 LITHOLOGY_DEFAULT_RISK = 3  # for units not matching any keyword
 
-# ── Land Cover Risk Classification (USGS LCMAP v1.3 class codes) ──────────────
-# LCMAP primary land cover classes used in place of NLCD:
-#   1=Developed, 2=Cropland, 3=Grass/Shrub, 4=Tree Cover,
-#   5=Water, 6=Wetland, 7=Ice/Snow, 8=Barren
-NLCD_RISK = {
-    1: 3,     # Developed — moderate (grading/impervious, variable drainage)
-    2: 3,     # Cropland — moderate (low vegetation cover, tillage loosens soil)
-    3: 3,     # Grass/Shrub — moderate (partial cover, exposed slopes)
-    4: 1,     # Tree Cover — low (roots stabilize soil, interception)
-    5: None,  # Water — exclude
-    6: None,  # Wetland — exclude
-    7: None,  # Ice/Snow — exclude
-    8: 5,     # Barren — very high (no vegetation, maximum exposure)
+# ── Land Cover Risk Classification (GAP/LANDFIRE 2011 ecosystem codes) ────────
+# Source: USGS GAP Analysis Program via Microsoft Planetary Computer ("gap")
+# Codes present in Santa Barbara County mapped to landslide risk scores (1–5).
+# None = exclude (water/wetland). Default for unknown codes = 3.
+GAP_RISK = {
+    # Water / Wetland — exclude
+    432: None,  # Temperate Pacific Freshwater Emergent Marsh
+    433: None,  # Temperate Pacific Freshwater Mudflat
+    455: None,  # Temperate Pacific Tidal Salt and Brackish Marsh
+    458: None,  # Inter-Mountain Basins Playa
+    509: None,  # Mediterranean California Eelgrass Bed
+    578: None,  # Open Water (Brackish/Salt)
+    579: None,  # Open Water (Fresh)
+    # Dense forest — score 1
+    55:  1,     # Mediterranean California Mixed Evergreen Forest
+    159: 1,     # California Montane Jeffrey Pine-(Ponderosa Pine) Woodland
+    162: 1,     # Mediterranean California Dry-Mesic Mixed Conifer Forest
+    165: 1,     # California Coastal Redwood Forest
+    539: 1,     # North American Warm Desert Bedrock Cliff and Outcrop
+    540: 1,     # North American Warm Desert Pavement
+    # Woodland, savanna, riparian, rocky — score 2
+    39:  2,     # California Central Valley Mixed Oak Savanna
+    40:  2,     # California Coastal Closed-Cone Conifer Forest and Woodland
+    41:  2,     # California Coastal Live Oak Woodland and Savanna
+    42:  2,     # California Lower Montane Blue Oak-Foothill Pine Woodland
+    43:  2,     # Central and Southern California Mixed Evergreen Woodland
+    45:  2,     # Southern California Oak Woodland and Savanna
+    183: 2,     # Great Basin Pinyon-Juniper Woodland
+    277: 2,     # California Central Valley Riparian Woodland and Shrubland
+    278: 2,     # Mediterranean California Foothill and Lower Montane Riparian Woodland
+    282: 2,     # North American Warm Desert Riparian Woodland and Shrubland
+    300: 2,     # Mediterranean California Mesic Serpentine Woodland and Chaparral
+    383: 2,     # Mediterranean California Coastal Bluff
+    489: 2,     # Inter-Mountain Basins Big Sagebrush Shrubland
+    516: 2,     # Southern California Coast Ranges Cliff and Canyon
+    563: 2,     # Introduced Upland Vegetation - Treed
+    # Chaparral, scrub, grassland, cultivated, developed — score 3
+    296: 3,     # California Maritime Chaparral
+    297: 3,     # California Mesic Chaparral
+    302: 3,     # Southern California Dry-Mesic Chaparral
+    303: 3,     # Southern California Coastal Scrub
+    304: 3,     # California Central Valley and Southern Coastal Grassland
+    305: 3,     # California Mesic Serpentine Grassland
+    359: 3,     # Sonora-Mojave Semi-Desert Chaparral
+    360: 3,     # California Montane Woodland and Chaparral
+    470: 3,     # Mojave Mid-Elevation Mixed Desert Scrub
+    472: 3,     # Sonora-Mojave Creosotebush-White Bursage Desert Scrub
+    476: 3,     # Sonora-Mojave Mixed Salt Desert Scrub
+    485: 3,     # Inter-Mountain Basins Mixed Salt Desert Scrub
+    552: 3,     # Unconsolidated Shore
+    556: 3,     # Cultivated Cropland
+    557: 3,     # Pasture/Hay
+    558: 3,     # Introduced Upland Vegetation - Annual Grassland
+    568: 3,     # Harvested Forest - Shrub Regeneration
+    581: 3,     # Developed, Open Space
+    582: 3,     # Developed, Low Intensity
+    583: 3,     # Developed, Medium Intensity
+    584: 3,     # Developed, High Intensity
+    # Unstable/disturbed surfaces — score 4
+    384: 4,     # Mediterranean California Northern Coastal Dune
+    385: 4,     # Mediterranean California Southern Coastal Dune
+    547: 4,     # Inter-Mountain Basins Shale Badland
+    567: 4,     # Harvested Forest - Grass/Forb Regeneration (clear-cut)
+    580: 4,     # Quarries, Mines, Gravel Pits and Oil Wells
+    570: 4,     # Recently Burned (2011 snapshot; fire history layer handles temporal decay)
+    # Barren — score 5
+    553: 5,     # Undifferentiated Barren Land
 }
 
 # ── Fault Distance Risk Classification ───────────────────────────────────────
@@ -145,42 +216,10 @@ FAULT_DISTANCE_BREAKS = [
     (2000, None, 1),
 ]
 
-# ── Fire History Risk Classification ─────────────────────────────────────────
-# Reference date: January 9, 2018 (Montecito debris flow)
-FIRE_REFERENCE_DATE = "2018-01-09"
-
-# (min_years_ago, max_years_ago_or_None, risk_score)
-FIRE_RISK_BREAKS = [
-    (0,  1,    5),   # burned within last 1 year — vegetation gone, hydrophobic layer
-    (1,  3,    4),   # 1–3 years — partial recovery
-    (3,  5,    3),   # 3–5 years — moderate recovery
-    (5,  10,   2),   # 5–10 years — substantial recovery
-    (10, None, 1),   # >10 years or unburned — baseline risk
-]
-FIRE_UNBURNED_RISK = 1
-
-# Name fragment used to identify the Thomas Fire in the perimeters dataset
-THOMAS_FIRE_NAME = "THOMAS"
-
-# ── Random Forest Hyperparameters ────────────────────────────────────────────
-RF_PARAMS = {
-    "n_estimators":     200,
-    "max_depth":        10,
-    "min_samples_leaf": 5,
-    "n_jobs":           -1,
-    "random_state":     RANDOM_SEED,
-}
-RF_NEGATIVE_RATIO = 5    # negative:positive sample ratio
-RF_TEST_SIZE      = 0.30
-RF_CV_FOLDS       = 5
-
-# Raster prediction chunk size (rows) — avoids memory errors on county-wide 10m grids
-CHUNK_ROWS = 1000
-
 # ── Feature column names (order must match normalized raster stack) ────────────
 FEATURE_COLS = [
     "slope", "curvature", "twi",
     "lithology", "landcover",
     "fault_distance", "rainfall",
-    "fire_history",
+    "ndvi", "soil",
 ]

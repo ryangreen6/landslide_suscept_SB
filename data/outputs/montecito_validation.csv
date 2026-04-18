@@ -1,6 +1,6 @@
-susceptibility_class,ahp,rf
-Very Low,0.0,0.0
-Low,0.38,0.97
-Moderate,24.47,21.12
-High,63.79,35.86
-Very High,11.36,42.06
+susceptibility_class,wlc
+Very Low,0.0
+Low,0.0
+Moderate,8.25
+High,83.43
+Very High,8.32

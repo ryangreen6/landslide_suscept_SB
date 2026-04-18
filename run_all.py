@@ -7,10 +7,11 @@ fails, the error is logged and the pipeline halts.
 
 Usage
 -----
-    python run_all.py                    # full pipeline
+    python run_all.py                    # full pipeline (stages 1–4, no figures)
     python run_all.py --start-from 3     # resume from stage 3
     python run_all.py --only 4           # run stage 4 only
-    python run_all.py --dpi 150          # pass --dpi flag to stage 5
+    python run_all.py --viz              # include stage 5 (figures + map)
+    python run_all.py --only 5           # figures only
 """
 
 import argparse
@@ -33,8 +34,8 @@ SCRIPTS_DIR = Path(__file__).parent / "scripts"
 PIPELINE = [
     (1, "01_data_prep.py",       "Data preparation (mosaic, reproject, clip)"),
     (2, "02_terrain_analysis.py","Terrain analysis (slope, aspect, TWI, curvature)"),
-    (3, "03_factor_layers.py",   "Factor layers (lithology, land cover, faults, fire)"),
-    (4, "04_modeling.py",        "Susceptibility modeling (Random Forest)"),
+    (3, "03_factor_layers.py",   "Factor layers (lithology, land cover, faults, NDVI, soil, precip)"),
+    (4, "04_modeling.py",        "Susceptibility modeling (WLC)"),
     (5, "05_visualization.py",   "Visualisation (figures + interactive map)"),
 ]
 
@@ -112,6 +113,10 @@ def parse_args() -> argparse.Namespace:
         "--no-interactive", action="store_true",
         help="Pass --no-interactive to stage 5 (skip Folium map)"
     )
+    parser.add_argument(
+        "--viz", action="store_true",
+        help="Include stage 5 (figures + interactive map). Excluded by default."
+    )
     return parser.parse_args()
 
 
@@ -125,7 +130,8 @@ def main() -> None:
         5: ["--dpi", str(args.dpi)] + (["--no-interactive"] if args.no_interactive else []),
     }
 
-    stages_to_run = [s for s in PIPELINE if s[0] >= args.start_from]
+    stages_to_run = [s for s in PIPELINE if s[0] >= args.start_from
+                     and (s[0] < 5 or args.viz)]
     if args.only is not None:
         stages_to_run = [s for s in PIPELINE if s[0] == args.only]
         if not stages_to_run:
