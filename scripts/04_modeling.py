@@ -104,6 +104,11 @@ def run_wlc_model(
         os.unlink(tmp_path)
         logger.info("  WLC masked to county boundary")
 
+    if config.DEM_10M_TIF.exists():
+        dem, _ = utils.read_raster(config.DEM_10M_TIF)
+        wlc = np.where((dem > 0) & np.isfinite(dem), wlc, np.nan)
+        logger.info("  WLC masked to land (DEM > 0)")
+
     wlc_classified = utils.reclassify_fixed(wlc, config.WLC_BREAKS)
     logger.info("  WLC fixed breaks: %s", config.WLC_BREAKS)
     return wlc, wlc_classified, config.WLC_BREAKS
