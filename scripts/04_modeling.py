@@ -64,6 +64,7 @@ def run_wlc_model(
     logger.info("  Weights: %s", {k: round(v, 2) for k, v in weights.items()})
 
     wlc = None
+    valid_count = None
     weight_used = 0.0
     for path, name in zip(factor_paths, feature_names):
         w = weights.get(name, 0.0)
@@ -71,18 +72,22 @@ def run_wlc_model(
             continue
         arr, _ = utils.read_raster(path)
         arr = np.where(np.isfinite(arr), arr, np.nan)
+        has_data = np.isfinite(arr).astype(np.uint8)
         layer = w * arr
         wlc = layer if wlc is None else np.nansum(np.stack([wlc, layer]), axis=0)
+        valid_count = has_data if valid_count is None else valid_count + has_data
         weight_used += w
 
     if wlc is None:
         raise ValueError("No valid factor rasters found for WLC.")
 
+    wlc = np.where(valid_count > 0, wlc, np.nan)
+
     if abs(weight_used - 1.0) > 0.01:
         logger.warning("  WLC weights sum to %.3f — normalising", weight_used)
         wlc = wlc / weight_used
 
-    wlc = np.clip(wlc, 0.0, 1.0).astype(np.float32)
+    wlc = np.where(np.isfinite(wlc), np.clip(wlc, 0.0, 1.0), np.nan).astype(np.float32)
     wlc_classified, wlc_breaks = utils.reclassify_jenks(wlc, n_classes=5)
     logger.info("  WLC Jenks breaks: %s", [round(b, 4) for b in wlc_breaks])
     return wlc, wlc_classified, wlc_breaks

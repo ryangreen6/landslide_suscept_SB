@@ -86,9 +86,10 @@ def build_interactive_map() -> None:
                 resampling=Resampling.nearest,
             )
 
-        rgba = cmap(norm(np.where(np.isfinite(dst), dst, np.nan)))
-        rgba[~np.isfinite(dst), 3] = 0.0
-        rgba[np.isfinite(dst),  3] = opacity
+        nodata_mask = ~np.isfinite(dst) | (dst == config.NODATA)
+        rgba = cmap(norm(np.where(~nodata_mask, dst, np.nan)))
+        rgba[nodata_mask,  3] = 0.0
+        rgba[~nodata_mask, 3] = opacity
         rgba_u8 = (rgba * 255).astype(np.uint8)
         img = PILImage.fromarray(rgba_u8, mode="RGBA")
         buf = _io.BytesIO()
