@@ -367,25 +367,6 @@ def build_interactive_map() -> None:
         grp.add_to(m)
         logger.info("  Added roads layer (%d segments)", len(roads_gdf))
 
-    ls_shp = config.PROCESSED_DIR / "landslide_inventory_utm.shp"
-    if ls_shp.exists():
-        ls = gpd.read_file(ls_shp).to_crs("EPSG:4326")
-        grp = folium.FeatureGroup(name="Historical Landslides", show=False)
-        for _, row in ls.iterrows():
-            lon, lat = row.geometry.centroid.x, row.geometry.centroid.y
-            date = str(row.get("date", row.get("Date", row.get("YEAR", "Unknown"))))
-            ls_type = str(row.get("type", row.get("Type", row.get("LSTYPE", "Unknown"))))
-            folium.CircleMarker(
-                location=[lat, lon], radius=4,
-                color="#cc3300", fill=True, fill_color="#ff5500", fill_opacity=0.9,
-                popup=folium.Popup(
-                    f"<b>Landslide</b><br>Date: {date}<br>Type: {ls_type}",
-                    max_width=200,
-                ),
-                tooltip="Historical landslide",
-            ).add_to(grp)
-        grp.add_to(m)
-        logger.info("  Added landslide inventory (%d points)", len(ls))
 
     risk_rows_flat = "".join(
         f'<span style="background:{config.SUSCEPTIBILITY_COLORS[i]};display:inline-block;'
@@ -404,7 +385,6 @@ def build_interactive_map() -> None:
         "Fault Lines": '<span style="color:red;font-weight:bold">\u2501\u2501</span> Fault Lines<br><span style="font-size:11px;color:#888;font-style:italic;display:block;margin-top:2px;">Hover over a fault line for details</span>',
         "Montecito 2018 Debris Flow": '<span style="background:red;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;opacity:0.7;"></span>Montecito 2018 Debris Flow<br>',
         "Geology": '<hr style="margin:4px 0"><b>Geology</b><br><span style="font-size:11px;color:#888;font-style:italic;display:block;max-width:140px;word-wrap:break-word;">Hover over an area for geological details</span><br>',
-        "Historical Landslides": '<span style="display:inline-block;width:10px;height:10px;background:#ff5500;border-radius:50%;margin-right:4px;border:1px solid #cc3300;vertical-align:middle;"></span>Historical Landslides<br>',
         "Roads": '<hr style="margin:4px 0"><span style="color:#C0E8F9;font-weight:bold">\u2501\u2501</span> Roads<br>',
         "Soil Erodibility": '<hr style="margin:4px 0"><b>Soil Erodibility</b><br><span style="font-size:11px;color:#888">Low \u2192 High (copper scale)</span><br>',
         "Precipitation Intensity": '<b>Precipitation Intensity</b><br><span style="font-size:11px;color:#888">Low \u2192 High (100-yr/24-hr, blues)</span><br>',
@@ -419,7 +399,7 @@ def build_interactive_map() -> None:
         f'var _activeLayers={{"Landslide Risk":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
         'var order=["Landslide Risk","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
-        '"Montecito 2018 Debris Flow","Geology","Historical Landslides","Roads"];'
+        '"Montecito 2018 Debris Flow","Geology","Roads"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
         '_rebuildLegend();\n'
@@ -565,7 +545,6 @@ function _sa(){{
   <ul style="margin:4px 0 0;padding-left:16px;line-height:1.85;color:#222;">
     <li><b>County Boundary</b> &mdash; U.S. Census Bureau TIGER/Line Shapefiles</li>
     <li><b>Fire Perimeters</b> &mdash; CAL FIRE Fire and Resource Assessment Program (FRAP)</li>
-    <li><b>Historical Landslides</b> &mdash; California Geological Survey (CGS) California Landslide Inventory (CaLSI)</li>
     <li><b>Montecito Debris Flow</b> &mdash; USGS / CGS 2018 Thomas Fire debris flow mapping</li>
   </ul>
   <p style="margin:12px 0 0;font-size:11px;color:#666;text-align:center;">&copy; Ryan Green, 2026</p>
@@ -669,7 +648,6 @@ window.addEventListener('load', function() {
     'Fault Lines': false,
     'Geology': false,
     'Montecito 2018 Debris Flow': false,
-    'Historical Landslides': false,
     'Roads': false,
   };
   var ctrl = document.querySelector('.leaflet-control-layers');
