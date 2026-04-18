@@ -62,6 +62,10 @@ def build_interactive_map() -> None:
         attr="Esri World Imagery", name="Satellite",
     ).add_to(m)
 
+    _county_wgs84 = None
+    if config.COUNTY_UTM_SHP.exists():
+        _county_wgs84 = gpd.read_file(config.COUNTY_UTM_SHP).to_crs("EPSG:4326")
+
     def _raster_to_overlay(tif_path, layer_name, cmap, norm, opacity=0.7, show=True):
         if not tif_path.exists():
             logger.warning("  Skipping %s (not found)", layer_name)
@@ -69,20 +73,23 @@ def build_interactive_map() -> None:
         from rasterio.warp import reproject as _reproject, Resampling, transform_bounds
         from rasterio.transform import from_bounds as _fb
         from rasterio.crs import CRS as _CRS
+        from rasterio.features import rasterize as _rasterize
+        from shapely.geometry import mapping as _mapping
 
         with rasterio.open(tif_path) as src:
             mb = transform_bounds(src.crs, _CRS.from_epsg(4326), *src.bounds)
-        out_w = 1024
+        out_w = 2048
         lat_scale = np.cos(np.radians((mb[1] + mb[3]) / 2))
         out_h = max(1, int(out_w * (mb[3] - mb[1]) / ((mb[2] - mb[0]) * lat_scale)))
         dst = np.full((out_h, out_w), np.nan, dtype=np.float32)
+        out_transform = _fb(*mb, out_w, out_h)
         with rasterio.open(tif_path) as src:
             _reproject(
                 source=rasterio.band(src, 1),
                 destination=dst,
                 src_transform=src.transform,
                 src_crs=src.crs,
-                dst_transform=_fb(*mb, out_w, out_h),
+                dst_transform=out_transform,
                 dst_crs=_CRS.from_epsg(4326),
                 resampling=Resampling.nearest,
             )
@@ -91,6 +98,16 @@ def build_interactive_map() -> None:
         rgba = cmap(norm(np.where(~nodata_mask, dst, np.nan)))
         rgba[nodata_mask,  3] = 0.0
         rgba[~nodata_mask, 3] = opacity
+
+        if _county_wgs84 is not None:
+            county_raster = _rasterize(
+                [(_mapping(g), 1) for g in _county_wgs84.geometry],
+                out_shape=(out_h, out_w),
+                transform=out_transform,
+                fill=0, dtype=np.uint8,
+            )
+            rgba[county_raster == 0, 3] = 0.0
+
         rgba_u8 = (rgba * 255).astype(np.uint8)
         img = PILImage.fromarray(rgba_u8, mode="RGBA")
         buf = _io.BytesIO()
