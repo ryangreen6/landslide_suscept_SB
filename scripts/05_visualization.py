@@ -563,7 +563,7 @@ function _sa(){{
       var fvals=typeof _gf==='function'?_gf(lat,lon):null;
       var just=typeof _justify==='function'?_justify(fvals,risk):'';
       var rHtml=risk>0?'<b style="color:'+_rc[risk]+'">'+_rl[risk]+'</b>':'Outside study area';
-      var justHtml=just?'<br><span style="font-size:12px;color:#444;font-style:italic">'+just+'</span>':'';
+      var justHtml=just?'<br><span style="font-size:12px;color:#aaa;font-style:italic">'+just+'</span>':'';
       fetch('https://macrostrat.org/api/geologic_units/map?lat='+lat+'&lng='+lon+'&response=long')
         .then(function(gr){{return gr.json();}})
         .then(function(gd){{
