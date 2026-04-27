@@ -14,6 +14,8 @@ Usage
     python run_all.py --only 5           # figures only
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 import subprocess
@@ -35,7 +37,7 @@ PIPELINE = [
     (1, "01_data_prep.py",       "Data preparation (mosaic, reproject, clip)"),
     (2, "02_terrain_analysis.py","Terrain analysis (slope, aspect, TWI, curvature)"),
     (3, "03_factor_layers.py",   "Factor layers (lithology, land cover, faults, NDVI, soil, precip)"),
-    (4, "04_modeling.py",        "Susceptibility modeling (WLC)"),
+    (4, "04_modeling.py",        "Susceptibility modeling (LR)"),
     (5, "05_visualization.py",   "Visualisation (figures + interactive map)"),
 ]
 

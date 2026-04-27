@@ -3,26 +3,31 @@
 ──────────────
 Stage 4 of the landslide susceptibility pipeline.
 
-Weighted Linear Combination (WLC) Model
-    No training inventory required. Each normalised factor raster is multiplied
-    by its literature-derived weight (see config.WLC_WEIGHTS) and summed to
-    produce a continuous susceptibility index (0–1), then classified into 5
-    classes using Jenks Natural Breaks.
-
-Validation against the January 9, 2018 Montecito debris flow polygon is
-performed if the shapefile is available.
+Logistic Regression Model
+    Presence points: high-confidence USGS NLI polygon centroids (Confidence >= 3).
+    Pseudo-absences: random county-wide sample (5:1 ratio).
+    TWI excluded — collinear with slope (TWI = ln(upslope_area / tan(slope))).
+    Fault distance excluded — trigger factor, not inherent terrain property.
+    NaN factors imputed with per-column median.
+    Classification: percentile breaks on the LR probability distribution
+    (bottom 30% / 30-50 / 50-70 / 70-85 / top 15%).
+    Performance: spatial block CV AUC + 20% random hold-out hit rate.
+    External validation: USGS 2023 Santa Ynez Mountains inventory (not used in training).
 
 Outputs
 -------
-    data/outputs/susceptibility_wlc_probability.tif
-    data/outputs/susceptibility_wlc_classified.tif
+    data/outputs/susceptibility_lr_probability.tif
+    data/outputs/susceptibility_lr_classified.tif
+    data/outputs/lr_coefficients.csv
+    data/outputs/lr_validation.csv
     data/outputs/model_metrics.json
-    data/outputs/montecito_validation.csv
 
 Usage
 -----
     python scripts/04_modeling.py
 """
+
+from __future__ import annotations
 
 import json
 import sys
@@ -41,139 +46,274 @@ logger = utils.get_logger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-# ── Weighted Linear Combination ───────────────────────────────────────────────
-
-def run_wlc_model(
-    factor_paths: list[Path],
-    feature_names: list[str],
-    weights: dict,
+def run_logistic_regression(
+    factor_paths: list,
+    feature_names: list,
     profile: dict,
-) -> tuple[np.ndarray, np.ndarray, list]:
-    """Compute a weighted linear combination susceptibility index.
-
-    Args:
-        factor_paths: Ordered list of normalised factor raster paths.
-        feature_names: Names matching the order of factor_paths.
-        weights: Dict mapping feature name to weight (should sum to 1.0).
-        profile: Rasterio profile for output rasters.
-
-    Returns:
-        Tuple of (wlc_prob array 0-1, wlc_classified array 1-5, jenks_breaks).
-    """
-    logger.info("Computing WLC susceptibility index …")
-    logger.info("  Weights: %s", {k: round(v, 2) for k, v in weights.items()})
-
-    wlc = None
-    valid_count = None
-    weight_used = 0.0
-    for path, name in zip(factor_paths, feature_names):
-        w = weights.get(name, 0.0)
-        if w == 0.0 or not path.exists():
-            continue
-        arr, _ = utils.read_raster(path)
-        arr = np.where(np.isfinite(arr), arr, np.nan)
-        has_data = np.isfinite(arr).astype(np.uint8)
-        layer = w * arr
-        wlc = layer if wlc is None else np.nansum(np.stack([wlc, layer]), axis=0)
-        valid_count = has_data if valid_count is None else valid_count + has_data
-        weight_used += w
-
-    if wlc is None:
-        raise ValueError("No valid factor rasters found for WLC.")
-
-    wlc = np.where(valid_count > 0, wlc, np.nan)
-
-    if abs(weight_used - 1.0) > 0.01:
-        logger.warning("  WLC weights sum to %.3f — normalising", weight_used)
-        wlc = wlc / weight_used
-
-    wlc = np.where(np.isfinite(wlc), np.clip(wlc, 0.0, 1.0), np.nan).astype(np.float32)
-
-    if config.COUNTY_UTM_SHP.exists():
-        import tempfile, os
-        from rasterio.mask import mask as rio_mask
-        from shapely.geometry import mapping as geo_mapping
-        county = gpd.read_file(config.COUNTY_UTM_SHP)
-        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
-            tmp_path = tmp.name
-        utils.write_raster(wlc, profile.copy(), tmp_path)
-        with rasterio.open(tmp_path) as src:
-            geoms = [geo_mapping(g) for g in county.geometry]
-            masked, _ = rio_mask(src, geoms, crop=False, nodata=np.nan, filled=True)
-        wlc = masked[0].astype(np.float32)
-        os.unlink(tmp_path)
-        logger.info("  WLC masked to county boundary")
-
-    if config.DEM_10M_TIF.exists():
-        dem, _ = utils.read_raster(config.DEM_10M_TIF)
-        land = (dem > 0.5) & np.isfinite(dem)
-        wlc = np.where(land, wlc, np.nan)
-        logger.info("  WLC masked to land (DEM > 0.5)")
-
-    wlc_classified = utils.reclassify_fixed(wlc, config.WLC_BREAKS)
-    logger.info("  WLC fixed breaks: %s", config.WLC_BREAKS)
-    return wlc, wlc_classified, config.WLC_BREAKS
-
-
-# ── Montecito Validation ──────────────────────────────────────────────────────
-
-def validate_montecito(classified: np.ndarray, profile: dict) -> dict:
-    """Assess WLC output within the 2018 Montecito debris flow extent.
-
-    Args:
-        classified: 5-class WLC susceptibility array.
-        profile: Rasterio profile for the susceptibility raster.
-
-    Returns:
-        Dict mapping class labels to % area within the debris flow polygon.
-    """
-    debris_shp = config.PROCESSED_DIR / "montecito_debris_utm.shp"
-    if not debris_shp.exists():
-        logger.warning("Montecito debris flow shapefile not found — skipping validation")
+) -> dict:
+    if not config.USGS_LS_GPKG.exists():
+        logger.warning("NLI GeoPackage not found — skipping logistic regression")
         return {}
 
-    logger.info("Running Montecito 2018 validation …")
-    debris = gpd.read_file(debris_shp)
-    from shapely.geometry import mapping as geo_mapping
-    from rasterio.mask import mask as rio_mask
-    import tempfile, os, rasterio as rio
+    from rasterio.transform import rowcol
+    from sklearn.impute import SimpleImputer
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+    from sklearn.preprocessing import StandardScaler
+    import shapely
 
-    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
-        tmp_path = tmp.name
-    utils.write_raster(classified, profile.copy(), tmp_path)
+    logger.info("Running logistic regression model …")
 
-    with rio.open(tmp_path) as src:
-        geoms = [geo_mapping(g) for g in debris.geometry]
-        masked, _ = rio_mask(src, geoms, crop=True, nodata=config.NODATA)
-        clipped = masked[0].astype(np.float32)
-        clipped[clipped == config.NODATA] = np.nan
+    transform = profile["transform"]
+    height, width = profile["height"], profile["width"]
 
-    valid_cells = clipped[np.isfinite(clipped)]
-    total = len(valid_cells)
-    class_pct = {}
-    for cls in range(1, 6):
-        count = np.sum(valid_cells == cls)
-        class_pct[config.SUSCEPTIBILITY_LABELS[cls]] = round(
-            float(100.0 * count / total) if total > 0 else 0.0, 2
+    # ── Load factor rasters (TWI excluded — collinear with slope) ─────────────
+    factor_arrs = {}
+    valid_names = []
+    for path, name in zip(factor_paths, feature_names):
+        if name == "twi":
+            continue
+        if path.exists():
+            arr, _ = utils.read_raster(path)
+            factor_arrs[name] = arr.astype(np.float32)
+            valid_names.append(name)
+
+    if not valid_names:
+        logger.warning("No factor rasters available for logistic regression")
+        return {}
+
+    # ── Presence points: NLI high-confidence centroids ────────────────────────
+    nli = gpd.read_file(config.USGS_LS_GPKG).to_crs(config.CRS_ANALYSIS)
+    nli_hq = nli[nli["Confidence"] >= 3].copy()
+    centroids = nli_hq.geometry.centroid
+    pres_x, pres_y = centroids.x.values, centroids.y.values
+    logger.info("  %d NLI presence points (Confidence >= 3)", len(pres_x))
+
+    rows_p, cols_p = rowcol(transform, pres_x, pres_y)
+    rows_p, cols_p = np.asarray(rows_p), np.asarray(cols_p)
+    ib_p = (rows_p >= 0) & (rows_p < height) & (cols_p >= 0) & (cols_p < width)
+    rows_p, cols_p = rows_p[ib_p], cols_p[ib_p]
+    pres_x, pres_y = pres_x[ib_p], pres_y[ib_p]
+
+    X_pres_raw = np.column_stack([factor_arrs[n][rows_p, cols_p] for n in valid_names])
+    has_data_p = np.any(np.isfinite(X_pres_raw), axis=1)
+    X_pres_raw = X_pres_raw[has_data_p]
+    rows_p, cols_p = rows_p[has_data_p], cols_p[has_data_p]
+    pres_x, pres_y = pres_x[has_data_p], pres_y[has_data_p]
+    n_pres = len(X_pres_raw)
+    logger.info("  %d presence points", n_pres)
+
+    # ── Pseudo-absence points (county-wide, 200m exclusion buffer) ────────────
+    from scipy.ndimage import distance_transform_edt as _edt
+
+    county = gpd.read_file(config.COUNTY_UTM_SHP)
+    county_geom = county.geometry.union_all()
+    bounds = county_geom.bounds
+
+    # Exclusion zone: 200m buffer around all known landslide locations
+    ls_raster = np.zeros((height, width), dtype=np.uint8)
+    ls_raster[rows_p, cols_p] = 1
+    if config.SANTA_YNEZ_2023_CSV.exists():
+        sy_excl = pd.read_csv(config.SANTA_YNEZ_2023_CSV)
+        sy_excl = sy_excl[sy_excl["HillslopeSetting"] == "Unmodified"]
+        sy_gdf = gpd.GeoDataFrame(
+            sy_excl, geometry=gpd.points_from_xy(sy_excl.Longitude, sy_excl.Latitude), crs="EPSG:4326"
+        ).to_crs(config.CRS_ANALYSIS)
+        sy_r, sy_c = rowcol(transform, sy_gdf.geometry.x.values, sy_gdf.geometry.y.values)
+        sy_r, sy_c = np.asarray(sy_r), np.asarray(sy_c)
+        ib_sy = (sy_r >= 0) & (sy_r < height) & (sy_c >= 0) & (sy_c < width)
+        ls_raster[sy_r[ib_sy], sy_c[ib_sy]] = 1
+    excl_mask = _edt(1 - ls_raster) < 20  # 200m at 10m resolution
+
+    rng = np.random.default_rng(config.RANDOM_SEED)
+    n_pseudo = n_pres * 5
+    cand_x = rng.uniform(bounds[0], bounds[2], n_pseudo * 8)
+    cand_y = rng.uniform(bounds[1], bounds[3], n_pseudo * 8)
+    in_county = shapely.contains_xy(county_geom, cand_x, cand_y)
+    cand_x, cand_y = cand_x[in_county], cand_y[in_county]
+
+    rows_cand, cols_cand = rowcol(transform, cand_x, cand_y)
+    rows_cand, cols_cand = np.asarray(rows_cand), np.asarray(cols_cand)
+    ib = (rows_cand >= 0) & (rows_cand < height) & (cols_cand >= 0) & (cols_cand < width)
+    rows_cand, cols_cand = rows_cand[ib], cols_cand[ib]
+    cand_x, cand_y = cand_x[ib], cand_y[ib]
+
+    eligible = ~excl_mask[rows_cand, cols_cand]
+    rows_a = rows_cand[eligible][:n_pseudo]
+    cols_a = cols_cand[eligible][:n_pseudo]
+    abs_x  = cand_x[eligible][:n_pseudo]
+    abs_y  = cand_y[eligible][:n_pseudo]
+
+    X_abs_raw = np.column_stack([factor_arrs[n][rows_a, cols_a] for n in valid_names])
+    has_data_a = np.any(np.isfinite(X_abs_raw), axis=1)
+    X_abs_raw = X_abs_raw[has_data_a]
+    abs_x, abs_y = abs_x[has_data_a], abs_y[has_data_a]
+    n_abs = len(X_abs_raw)
+    logger.info("  %d pseudo-absence points", n_abs)
+
+    # ── Impute NaN with per-column median (fit on combined training data) ──────
+    imputer = SimpleImputer(strategy="median")
+    X_combined = imputer.fit_transform(np.vstack([X_pres_raw, X_abs_raw]))
+    X_pres = X_combined[:n_pres]
+    X_abs = X_combined[n_pres:]
+
+    X = np.vstack([X_pres, X_abs])
+    y = np.concatenate([np.ones(n_pres), np.zeros(n_abs)])
+    all_x = np.concatenate([pres_x, abs_x])
+    all_y = np.concatenate([pres_y, abs_y])
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # ── Spatial block CV (5x5 grid, leave-one-block-out) ──────────────────────
+    n_blocks = 5
+    x_bin = np.digitize(all_x, np.linspace(bounds[0], bounds[2], n_blocks + 1)[1:-1])
+    y_bin = np.digitize(all_y, np.linspace(bounds[1], bounds[3], n_blocks + 1)[1:-1])
+    block_ids = x_bin * n_blocks + y_bin
+
+    cv_aucs = []
+    for block in np.unique(block_ids):
+        test = block_ids == block
+        train = ~test
+        if len(np.unique(y[test])) < 2 or train.sum() < 20:
+            continue
+        clf_cv = LogisticRegression(
+            C=1.0, solver="lbfgs", max_iter=1000, random_state=config.RANDOM_SEED
+        )
+        clf_cv.fit(X_scaled[train], y[train])
+        cv_aucs.append(float(roc_auc_score(y[test], clf_cv.predict_proba(X_scaled[test])[:, 1])))
+
+    if cv_aucs:
+        cv_auc_mean = round(float(np.mean(cv_aucs)), 4)
+        cv_auc_std = round(float(np.std(cv_aucs)), 4)
+    else:
+        logger.warning("  No valid spatial CV blocks — CV AUC unavailable")
+        cv_auc_mean, cv_auc_std = float("nan"), float("nan")
+    logger.info("  Spatial CV AUC: %.3f +/- %.3f (%d blocks)", cv_auc_mean, cv_auc_std, len(cv_aucs))
+
+    # ── Final model on all data ────────────────────────────────────────────────
+    clf = LogisticRegression(C=1.0, solver="lbfgs", max_iter=1000, random_state=config.RANDOM_SEED)
+    clf.fit(X_scaled, y)
+
+    # ── Apply to full raster ───────────────────────────────────────────────────
+    logger.info("  Applying LR to full raster …")
+    from rasterio.features import rasterize as _rasterize
+    county_gdf = gpd.read_file(config.COUNTY_UTM_SHP)
+    county_union = county_gdf.geometry.union_all()
+    county_raster = _rasterize(
+        [(county_union, 1)],
+        out_shape=(height, width),
+        transform=transform,
+        fill=0,
+        dtype=np.uint8,
+    ).astype(bool)
+    dem, _ = utils.read_raster(config.DEM_10M_TIF)
+    land_mask = county_raster & np.isfinite(dem) & (dem > 0)
+
+    flat_raw = np.column_stack([factor_arrs[n][land_mask] for n in valid_names])
+    flat_imputed = imputer.transform(flat_raw)
+    prob_flat = clf.predict_proba(scaler.transform(flat_imputed))[:, 1].astype(np.float32)
+
+    lr_prob = np.full((height, width), np.nan, dtype=np.float32)
+    lr_prob[land_mask] = prob_flat
+
+    # ── Percentile breaks on LR probability distribution ──────────────────────
+    valid_prob = lr_prob[np.isfinite(lr_prob)].flatten()
+    p30, p50, p70, p85 = np.percentile(valid_prob, [30, 50, 70, 85])
+    lr_breaks = [0.0, float(p30), float(p50), float(p70), float(p85), 1.0]
+    logger.info("  LR percentile breaks: %s", [round(b, 4) for b in lr_breaks])
+
+    lr_classified = utils.reclassify_fixed(lr_prob, lr_breaks)
+
+    utils.write_raster(lr_prob, profile.copy(), config.SUSCEPTIBILITY_LR_PROB_TIF)
+    utils.write_raster(lr_classified, profile.copy(), config.SUSCEPTIBILITY_LR_TIF)
+    logger.info("LR probability map → %s", config.SUSCEPTIBILITY_LR_PROB_TIF)
+    logger.info("LR classified map → %s", config.SUSCEPTIBILITY_LR_TIF)
+
+    # ── Factor importance ──────────────────────────────────────────────────────
+    coef = clf.coef_[0]
+    norm_coef = np.abs(coef) / np.abs(coef).sum()
+    coef_df = pd.DataFrame({
+        "factor":               valid_names,
+        "lr_coefficient":       coef.round(4).tolist(),
+        "lr_normalized_weight": norm_coef.round(4).tolist(),
+    }).sort_values("lr_normalized_weight", ascending=False)
+    coef_df.to_csv(config.LR_COEFFICIENTS_CSV, index=False)
+    logger.info("LR coefficients → %s", config.LR_COEFFICIENTS_CSV)
+    for _, row in coef_df.iterrows():
+        logger.info(
+            "  %-18s  raw %+.3f  norm %.3f",
+            row["factor"], row["lr_coefficient"], row["lr_normalized_weight"],
         )
 
-    high_pct = class_pct.get("High", 0) + class_pct.get("Very High", 0)
-    logger.info("  WLC — High+Very High within debris flow: %.1f%%  (target: majority)", high_pct)
+    # ── 20% random hold-out hit rate (unbiased) ───────────────────────────────
+    rng_ho = np.random.default_rng(config.RANDOM_SEED + 1)
+    test_idx = rng_ho.choice(n_pres, size=int(n_pres * 0.2), replace=False)
+    is_test_p = np.zeros(n_pres, dtype=bool)
+    is_test_p[test_idx] = True
+    test_rows_p, test_cols_p = rows_p[is_test_p], cols_p[is_test_p]
+    logger.info("  Hit-rate hold-out: %d of %d NLI presences (random 20%%)", int(is_test_p.sum()), n_pres)
 
-    os.unlink(tmp_path)
+    cls_vals = lr_classified[test_rows_p, test_cols_p]
+    cls_valid = cls_vals[(cls_vals >= 1) & (cls_vals <= 5)]
+    n_cls = len(cls_valid)
+    hit_rate = {}
+    for c in range(1, 6):
+        pct = round(float(100.0 * np.sum(cls_valid == c) / n_cls) if n_cls else 0.0, 2)
+        hit_rate[config.SUSCEPTIBILITY_LABELS[c]] = pct
+    high_pct = hit_rate.get("High", 0.0) + hit_rate.get("Very High", 0.0)
+    logger.info("  High+Very High at held-out NLI centroids: %.1f%%", high_pct)
 
-    result = {"wlc": class_pct}
-    df = pd.DataFrame(result)
-    df.index.name = "susceptibility_class"
-    df.to_csv(config.MONTECITO_VALIDATION_CSV)
-    logger.info("Montecito validation saved → %s", config.MONTECITO_VALIDATION_CSV)
-    return result
+    pd.DataFrame({"lr": hit_rate}).rename_axis("susceptibility_class").to_csv(
+        config.LR_VALIDATION_CSV
+    )
+    logger.info("LR validation saved → %s", config.LR_VALIDATION_CSV)
 
+    # ── External validation: Santa Ynez 2023 (not used in training) ───────────
+    sy_ext = {}
+    if config.SANTA_YNEZ_2023_CSV.exists():
+        sy = pd.read_csv(config.SANTA_YNEZ_2023_CSV)
+        sy = sy[sy["HillslopeSetting"] == "Unmodified"].copy()
+        sy_gdf = gpd.GeoDataFrame(
+            sy, geometry=gpd.points_from_xy(sy.Longitude, sy.Latitude), crs="EPSG:4326"
+        ).to_crs(config.CRS_ANALYSIS)
+        sy_ext_x = sy_gdf.geometry.x.values
+        sy_ext_y = sy_gdf.geometry.y.values
+        rows_sy, cols_sy = rowcol(transform, sy_ext_x, sy_ext_y)
+        rows_sy, cols_sy = np.asarray(rows_sy), np.asarray(cols_sy)
+        ib_sy = (rows_sy >= 0) & (rows_sy < height) & (cols_sy >= 0) & (cols_sy < width)
+        rows_sy, cols_sy = rows_sy[ib_sy], cols_sy[ib_sy]
+        cls_sy = lr_classified[rows_sy, cols_sy]
+        cls_sy_valid = cls_sy[(cls_sy >= 1) & (cls_sy <= 5)]
+        n_sy = len(cls_sy_valid)
+        sy_hit = {}
+        for c in range(1, 6):
+            pct = round(float(100.0 * np.sum(cls_sy_valid == c) / n_sy) if n_sy else 0.0, 2)
+            sy_hit[config.SUSCEPTIBILITY_LABELS[c]] = pct
+        sy_high_pct = sy_hit.get("High", 0.0) + sy_hit.get("Very High", 0.0)
+        logger.info("  Santa Ynez 2023 external validation: %d points", n_sy)
+        logger.info("  High+Very High at Santa Ynez 2023 points: %.1f%%", sy_high_pct)
+        sy_ext = {
+            "n_points": n_sy,
+            "high_plus_very_high_pct": round(sy_high_pct, 2),
+            "hit_rate_by_class": sy_hit,
+        }
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+    return {
+        "n_presences": n_pres,
+        "n_pseudo_absences": n_abs,
+        "cv_auc_mean": cv_auc_mean,
+        "cv_auc_std": cv_auc_std,
+        "n_cv_blocks": len(cv_aucs),
+        "lr_breaks": lr_breaks,
+        "high_plus_very_high_pct": round(high_pct, 2),
+        "hit_rate_by_class": hit_rate,
+        "coefficients": coef_df.to_dict(orient="records"),
+        "santa_ynez_2023_external_validation": sy_ext,
+    }
+
 
 def main() -> None:
-    """Run the WLC modeling stage."""
     utils.ensure_dirs()
 
     factor_paths = [
@@ -182,10 +322,10 @@ def main() -> None:
         config.NORM_TWI_TIF,
         config.NORM_LITHOLOGY_TIF,
         config.NORM_LANDCOVER_TIF,
-        config.NORM_FAULT_TIF,
         config.NORM_PRECIP_TIF,
         config.NORM_NDVI_TIF,
         config.NORM_SOIL_TIF,
+        config.NORM_BURN_TIF,
     ]
     feature_names = config.FEATURE_COLS
 
@@ -197,28 +337,16 @@ def main() -> None:
     with rasterio.open(existing[0]) as src:
         profile = src.profile.copy()
 
+    logger.info("=== Logistic Regression Model ===")
+    lr_results = run_logistic_regression(factor_paths, feature_names, profile)
+
     metrics = {}
-
-    logger.info("=== Weighted Linear Combination Model ===")
-    wlc_prob, wlc_classified, wlc_breaks = run_wlc_model(
-        factor_paths, feature_names, config.WLC_WEIGHTS, profile
-    )
-    utils.write_raster(wlc_prob, profile.copy(), config.SUSCEPTIBILITY_WLC_PROB_TIF)
-    logger.info("WLC probability map → %s", config.SUSCEPTIBILITY_WLC_PROB_TIF)
-    utils.write_raster(wlc_classified, profile.copy(), config.SUSCEPTIBILITY_WLC_TIF)
-    logger.info("WLC classified map → %s", config.SUSCEPTIBILITY_WLC_TIF)
-    metrics["wlc_jenks_breaks"] = wlc_breaks
-    metrics["wlc_weights"] = config.WLC_WEIGHTS
-
-    logger.info("=== Montecito Validation ===")
-    val_results = validate_montecito(wlc_classified, profile)
-    if val_results:
-        metrics["montecito_validation"] = val_results
+    if lr_results:
+        metrics["logistic_regression"] = lr_results
 
     with open(config.MODEL_METRICS_JSON, "w") as f:
         json.dump(metrics, f, indent=2, default=str)
     logger.info("Model metrics saved → %s", config.MODEL_METRICS_JSON)
-
     logger.info("=== Stage 4 complete ===")
 
 

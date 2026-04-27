@@ -1,51 +1,87 @@
-Landslide Susceptibility Model — Key References
-================================================
+Landslide Susceptibility Model -- Literature References
+=======================================================
+Santa Barbara County WLC Model | Ryan Green, 2026
 
-Weighted Linear Combination (WLC) Factor Weights
--------------------------------------------------
-Slope: 0.30 | Lithology: 0.20 | TWI: 0.15 | Fault Distance: 0.12
-Land Cover: 0.10 | Fire History: 0.08 | Curvature: 0.03 | Precipitation: 0.02
 
-These weights are synthesized from the sources below. Slope and lithology as
-dominant controls are consistent across studies. Fire history weight reflects
-the post-fire debris flow context of the 2018 Montecito event.
+WLC METHODOLOGY AND FACTOR WEIGHTS
+------------------------------------
 
-Primary Sources
----------------
 Dai, F.C. & Lee, C.F. (2002). Landslide characteristics and slope instability
   modeling using GIS, Lantau Island, Hong Kong. Geomorphology, 42(3-4), 213-228.
-  — Establishes slope as the primary control in terrain-based susceptibility models.
+  -- Establishes slope gradient as the dominant control in terrain-based
+     susceptibility models; used to justify slope receiving the highest weight (28%).
 
 Ayalew, L. & Yamagishi, H. (2005). The application of GIS-based logistic
   regression for landslide susceptibility mapping in the Kakuda-Yahiko Mountains,
   Central Japan. Geomorphology, 65(1-2), 15-31.
-  — Widely cited weight derivations for GIS-based overlay approaches.
+  -- Widely cited GIS overlay approach; informed relative weighting of slope,
+     geology, and proximity to faults.
 
 Saha, A.K., Gupta, R.P., Sarkar, I., Arora, M.K., & Csaplovics, E. (2005).
   An approach for GIS-based statistical landslide susceptibility zonation with a
   case study in the Himalayas. Landslides, 2(1), 61-69.
-  — AHP-based weighting framework used as a structural template.
+  -- AHP-based weighting framework used as a structural template for assigning
+     relative factor importance across the nine model inputs.
 
 Pradhan, B. & Lee, S. (2010). Landslide susceptibility assessment and factor
   effect analysis: backpropagation artificial neural networks and their comparison
   with frequency ratio and bivariate logistic regression modelling.
   Environmental Modelling & Software, 25(6), 747-759.
-  — Compares weighted overlay and ML approaches; informs relative factor rankings.
+  -- Compares WLC and machine learning factor rankings; used to cross-check the
+     relative ordering of factors in this model.
 
-Regional / Post-Montecito Sources
-----------------------------------
+
+TOPOGRAPHIC WETNESS INDEX (TWI)
+---------------------------------
+
+Beven, K.J. & Kirkby, M.J. (1979). A physically based, variable contributing
+  area model of basin hydrology. Hydrological Sciences Bulletin, 24(1), 43-69.
+  -- Original formulation of the Topographic Wetness Index (TWI), which underlies
+     the hydrological flow accumulation factor used in this model.
+
+
+SOIL ERODIBILITY
+-----------------
+
+Wischmeier, W.H. & Smith, D.D. (1978). Predicting Rainfall Erosion Losses: A
+  Guide to Conservation Planning. USDA Agriculture Handbook No. 537.
+  -- Defines the K-factor (soil erodibility) used as the basis for scoring
+     soil units from the USDA gSSURGO database in this model.
+
+
+MONTECITO DEBRIS FLOW AND THOMAS FIRE
+---------------------------------------
+
 Kean, J.W., Staley, D.M., Lancaster, J.T., Rengers, F.K., Swanson, B.J.,
   Coe, J.A., Hernandez, J.L., Sigman, A.J., Allstadt, K.E., & Lindsay, D.N.
   (2019). Inundation, flow dynamics, and damage in the 9 January 2018 Montecito
   debris-flow event, California, USA. Geosphere, 15(4), 1140-1163.
-  — Primary source for Montecito debris flow dynamics and contributing factors.
+  -- Primary source for the Montecito debris flow event; used to define the
+     validation target and confirm that steep, recently burned slopes were the
+     principal contributing conditions.
 
-USGS Open-File Report 2018-1001: Post-fire debris-flow hazard assessment for
-  the area burned by the 2017 Thomas Fire in Ventura and Santa Barbara Counties,
-  California. Staley et al. (2018).
-  — Quantifies slope-fire interaction in this specific terrain; informs fire
-    history weighting relative to other factors.
+Staley, D.M., Negri, J.A., Kean, J.W., Laber, J.L., Tillery, A.C., &
+  Youberg, A.M. (2018). Prediction of spatially explicit rainfall intensity-
+  duration thresholds for post-fire debris-flow generation in the western United
+  States. Geomorphology, 278, 149-162.
+  -- Quantifies rainfall intensity thresholds and slope-fire interaction for
+     post-fire debris flow generation; informs relative weighting of slope and
+     land cover in this model's fire-affected context.
 
-USGS Open-File Report 2019-1015: Preliminary assessment of the debris-flow
-  hazards following the 2018 Holy Fire in the San Gabriel Mountains, California.
-  — Companion report, same methodology, cross-validates Thomas Fire approach.
+Staley, D.M. et al. (2018). Post-fire debris-flow hazard assessment for the
+  area burned by the 2017 Thomas Fire in Ventura and Santa Barbara Counties,
+  California. USGS Open-File Report 2018-1001.
+  -- Site-specific hazard assessment for the Thomas Fire burn scar; documents the
+     slope thresholds and catchment characteristics that produced the Montecito
+     event used as the primary validation target.
+
+
+HISTORICAL LANDSLIDE INVENTORY
+---------------------------------
+
+U.S. Geological Survey (2025). Landslide Inventories across the United States,
+  ver. 3.0, February 2025. ScienceBase data release.
+  https://www.sciencebase.gov/catalog/item/671eef1fd34ed0f827ea9f12
+  -- Source for the 1,043 historical landslide deposit polygons displayed in the
+     interactive map for Santa Barbara County. Confidence field scale confirmed
+     from this release: 1 = Possible, 3 = Likely, 8 = High confidence.

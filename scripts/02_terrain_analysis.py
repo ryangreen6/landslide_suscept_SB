@@ -21,6 +21,8 @@ Usage
     python scripts/02_terrain_analysis.py --dem path/to/custom_dem.tif
 """
 
+from __future__ import annotations
+
 import argparse
 import sys
 from pathlib import Path

@@ -41,6 +41,7 @@ FIRE_PERIMETERS_SHP     = RAW_DIR / "fire_perimeters" / "California_Fire_Perimet
 GSSURGO_GDB             = RAW_DIR / "gSSURGO_CA.gdb"
 ATLAS14_ASC             = RAW_DIR / "atlas_14" / "sw100yr24ha_ams.asc"
 MONTECITO_DEBRIS_SHP    = RAW_DIR / "montecito_debris_flow" / "montecito_2018_debris_flow.shp"
+SANTA_YNEZ_2023_CSV     = RAW_DIR / "santa_ynez_mountains_2023" / "LandslideInventory.csv"
 
 # ── Processed Intermediate Files ──────────────────────────────────────────────
 DEM_10M_TIF        = PROCESSED_DIR / "dem_10m.tif"
@@ -72,6 +73,8 @@ NORM_ROAD_TIF      = PROCESSED_DIR / "norm_road_distance.tif"
 NORM_PRECIP_TIF    = PROCESSED_DIR / "norm_precipitation.tif"
 NORM_NDVI_TIF      = PROCESSED_DIR / "norm_ndvi.tif"
 NORM_SOIL_TIF      = PROCESSED_DIR / "norm_soil.tif"
+BURN_SEVERITY_TIF  = PROCESSED_DIR / "burn_severity.tif"
+NORM_BURN_TIF      = PROCESSED_DIR / "norm_burn_severity.tif"
 
 # County boundary reprojected to analysis CRS
 COUNTY_UTM_SHP     = PROCESSED_DIR / "sb_county_utm.shp"
@@ -79,29 +82,11 @@ USGS_LS_GPKG       = PROCESSED_DIR / "usgs_landslides_sb.gpkg"
 COUNTY_UTM_TIF     = PROCESSED_DIR / "county_mask.tif"
 
 # ── Output Files ──────────────────────────────────────────────────────────────
-SUSCEPTIBILITY_WLC_TIF      = OUTPUTS_DIR / "susceptibility_wlc_classified.tif"
-SUSCEPTIBILITY_WLC_PROB_TIF = OUTPUTS_DIR / "susceptibility_wlc_probability.tif"
-MODEL_METRICS_JSON          = OUTPUTS_DIR / "model_metrics.json"
-MONTECITO_VALIDATION_CSV    = OUTPUTS_DIR / "montecito_validation.csv"
-
-# ── WLC Classification Breaks (fixed, literature-anchored) ───────────────────
-# Applied to the continuous 0–1 WLC index.  Stable across runs regardless of
-# pixel distribution (unlike Jenks).  Calibrated so Montecito debris-flow area
-# (median WLC ≈ 0.33) falls solidly in the High class.
-WLC_BREAKS = [0.0, 0.15, 0.24, 0.30, 0.38, 1.0]
-
-# ── WLC Factor Weights (sum = 1.0) ────────────────────────────────────────────
-WLC_WEIGHTS = {
-    "slope":          0.28,
-    "curvature":      0.03,
-    "twi":            0.12,
-    "lithology":      0.18,
-    "landcover":      0.08,
-    "fault_distance": 0.12,
-    "rainfall":       0.03,
-    "ndvi":           0.08,
-    "soil":           0.08,
-}
+MODEL_METRICS_JSON         = OUTPUTS_DIR / "model_metrics.json"
+SUSCEPTIBILITY_LR_TIF      = OUTPUTS_DIR / "susceptibility_lr_classified.tif"
+SUSCEPTIBILITY_LR_PROB_TIF = OUTPUTS_DIR / "susceptibility_lr_probability.tif"
+LR_COEFFICIENTS_CSV        = OUTPUTS_DIR / "lr_coefficients.csv"
+LR_VALIDATION_CSV          = OUTPUTS_DIR / "lr_validation.csv"
 
 INTERACTIVE_HTML  = OUTPUTS_DIR / "susceptibility_interactive.html"
 
@@ -234,6 +219,5 @@ FAULT_DISTANCE_BREAKS = [
 FEATURE_COLS = [
     "slope", "curvature", "twi",
     "lithology", "landcover",
-    "fault_distance", "rainfall",
-    "ndvi", "soil",
+    "rainfall", "ndvi", "soil", "burn_severity",
 ]

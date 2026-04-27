@@ -66,6 +66,15 @@ def build_interactive_map() -> None:
     if config.COUNTY_UTM_SHP.exists():
         _county_wgs84 = gpd.read_file(config.COUNTY_UTM_SHP).to_crs("EPSG:4326")
 
+    _land_wgs84 = None
+    if config.GEOLOGY_SHP.exists():
+        _geo = gpd.read_file(config.GEOLOGY_SHP)
+        _county_bounds = _county_wgs84.union_all() if _county_wgs84 is not None else None
+        if _county_bounds is not None:
+            _geo_sb = _geo[_geo.intersects(_county_bounds) & (_geo["ORIG_LABEL"] != "water")]
+            from shapely.ops import unary_union as _uu
+            _land_wgs84 = gpd.GeoDataFrame(geometry=[_uu(_geo_sb.geometry)], crs="EPSG:4326")
+
     def _raster_to_overlay(tif_path, layer_name, cmap, norm, opacity=0.7, show=True, clip_to_county=False):
         if not tif_path.exists():
             logger.warning("  Skipping %s (not found)", layer_name)
@@ -96,17 +105,17 @@ def build_interactive_map() -> None:
         mb = transform_bounds(_MERC, _WGS84, *mb_m)
 
         nodata_mask = ~np.isfinite(dst) | (dst == config.NODATA)
-        if clip_to_county and _county_wgs84 is not None:
+        if clip_to_county and _land_wgs84 is not None:
             from rasterio.features import rasterize as _rasterize
             from shapely.geometry import mapping as _mapping
-            _county_merc = _county_wgs84.to_crs("EPSG:3857")
-            county_raster = _rasterize(
-                [(_mapping(g), 1) for g in _county_merc.geometry],
+            _land_merc = _land_wgs84.to_crs("EPSG:3857")
+            land_raster = _rasterize(
+                [(_mapping(g), 1) for g in _land_merc.geometry],
                 out_shape=(out_h, out_w),
                 transform=out_transform,
                 fill=0, dtype=np.uint8,
             )
-            nodata_mask = nodata_mask | (county_raster == 0)
+            nodata_mask = nodata_mask | (land_raster == 0)
         rgba = cmap(norm(np.where(~nodata_mask, dst, np.nan)))
         rgba[nodata_mask,  3] = 0.0
         rgba[~nodata_mask, 3] = opacity
@@ -128,8 +137,8 @@ def build_interactive_map() -> None:
         ).add_to(m)
         logger.info("  Added raster overlay: %s", layer_name)
 
-    _raster_to_overlay(config.SUSCEPTIBILITY_WLC_TIF,
-                       "Landslide Risk", SUSC_CMAP, SUSC_NORM, opacity=0.55)
+    _raster_to_overlay(config.SUSCEPTIBILITY_LR_TIF,
+                       "Landslide Risk", SUSC_CMAP, SUSC_NORM, opacity=0.55, clip_to_county=True)
 
     _raster_to_overlay(config.NORM_SOIL_TIF, "Soil Erodibility",
                        plt.get_cmap("copper"), mcolors.Normalize(0, 1),
@@ -140,14 +149,14 @@ def build_interactive_map() -> None:
 
     risk_bounds = None
     risk_b64 = None
-    if config.SUSCEPTIBILITY_WLC_TIF.exists():
+    if config.SUSCEPTIBILITY_LR_TIF.exists():
         import rasterio as _rio
         from rasterio.warp import reproject as _rp, Resampling as _RS, transform_bounds as _tb
         from rasterio.transform import from_bounds as _fb2
         from rasterio.crs import CRS as _CRS2
         _lw, _lh = 512, 512
         _lookup = np.zeros((_lh, _lw), dtype=np.uint8)
-        with _rio.open(config.SUSCEPTIBILITY_WLC_TIF) as _src:
+        with _rio.open(config.SUSCEPTIBILITY_LR_TIF) as _src:
             _rb = _tb(_src.crs, _CRS2.from_epsg(4326), *_src.bounds)
             _rp(
                 source=_rio.band(_src, 1),
@@ -166,13 +175,13 @@ def build_interactive_map() -> None:
         logger.info("  Risk lookup grid generated (%dx%d)", _lw, _lh)
 
     _factor_paths = [
-        config.NORM_SLOPE_TIF, config.NORM_CURVATURE_TIF, config.NORM_TWI_TIF,
+        config.NORM_SLOPE_TIF, config.NORM_CURVATURE_TIF,
         config.NORM_LITHOLOGY_TIF, config.NORM_LANDCOVER_TIF,
-        config.NORM_FAULT_TIF, config.NORM_PRECIP_TIF,
-        config.NORM_NDVI_TIF, config.NORM_SOIL_TIF,
+        config.NORM_PRECIP_TIF, config.NORM_NDVI_TIF, config.NORM_SOIL_TIF,
+        config.NORM_BURN_TIF,
     ]
-    _factor_names = ["slope", "curvature", "twi", "lithology", "landcover",
-                     "fault_dist", "rainfall", "ndvi", "soil"]
+    _factor_names = ["slope", "curvature", "lithology", "landcover",
+                     "rainfall", "ndvi", "soil", "burn_severity"]
     factor_b64s = {}
     if risk_bounds:
         _fw, _fh = 128, 128
@@ -283,6 +292,7 @@ def build_interactive_map() -> None:
         import concurrent.futures as _cf
         import requests as _req
         geo_gdf = gpd.read_file(geo_shp).to_crs("EPSG:4326")
+        geo_gdf = geo_gdf[geo_gdf.get("ORIG_LABEL", "") != "water"].reset_index(drop=True)
         if geo_cache.exists():
             with open(geo_cache) as _f:
                 _mac = json.load(_f)
@@ -337,25 +347,6 @@ def build_interactive_map() -> None:
             ).add_to(grp)
         grp.add_to(m)
         logger.info("  Added geology layer (%d features)", len(geo_gdf))
-
-    debris_shp = config.PROCESSED_DIR / "montecito_debris_utm.shp"
-    if debris_shp.exists():
-        debris = gpd.read_file(debris_shp).to_crs("EPSG:4326")
-        grp = folium.FeatureGroup(name="Montecito 2018 Debris Flow", show=False)
-        for _, row in debris.iterrows():
-            folium.GeoJson(
-                row.geometry.__geo_interface__,
-                style_function=lambda _: {"color": "red", "weight": 3,
-                                          "fillColor": "red", "fillOpacity": 0.55},
-                tooltip="January 9, 2018 Montecito Debris Flow",
-                popup=folium.Popup(
-                    "<b>Montecito Debris Flow</b><br>"
-                    "Date: January 9, 2018<br>"
-                    "Triggered by: Intense rainfall on Thomas Fire burn scar",
-                    max_width=250,
-                ),
-            ).add_to(grp)
-        grp.add_to(m)
 
 
 
@@ -422,6 +413,28 @@ def build_interactive_map() -> None:
         grp.add_to(m)
         logger.info("  Added USGS landslide inventory (%d polygons)", len(ls_gdf))
 
+        nli_hq = gpd.read_file(str(ls_gpkg)).to_crs("EPSG:26911")
+        nli_hq = nli_hq[nli_hq["Confidence"] >= 3].copy()
+        nli_hq["centroid"] = nli_hq.geometry.centroid
+        nli_hq = nli_hq.to_crs("EPSG:4326")
+        nli_hq["centroid"] = nli_hq["centroid"].to_crs("EPSG:4326")
+        grp_pts = folium.FeatureGroup(name="NLI Training Points (n=926)", show=False)
+        _conf_labels = {1: "Possible", 3: "Likely", 8: "High confidence"}
+        for _, row in nli_hq.iterrows():
+            c = row["centroid"]
+            conf_label = _conf_labels.get(int(row.get("Confidence", 3)), str(row.get("Confidence", "")))
+            tip = f"<b>NLI Training Point</b><br>Confidence: {conf_label}"
+            ls_type = str(row.get("LS_Type", "")).strip()
+            if ls_type and ls_type.lower() not in ("nan", "none", ""):
+                tip += f"<br>Type: {ls_type.title()}"
+            folium.CircleMarker(
+                location=[c.y, c.x], radius=4,
+                color="#e31a1c", weight=1, fill=True, fill_color="#e31a1c", fill_opacity=0.8,
+                tooltip=folium.Tooltip(tip, style="font-size:13px;"),
+            ).add_to(grp_pts)
+        grp_pts.add_to(m)
+        logger.info("  Added NLI training points (%d points)", len(nli_hq))
+
     risk_rows_flat = "".join(
         f'<span style="background:{config.SUSCEPTIBILITY_COLORS[i]};display:inline-block;'
         f'width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;"></span>'
@@ -437,9 +450,9 @@ def build_interactive_map() -> None:
         "Landslide Risk": f'<b style="font-size:14px">Landslide Risk</b><br>{risk_rows_flat}',
         "Fire Perimeters (2016\u2013Present)": '<hr style="margin:4px 0"><span style="color:darkorange;font-weight:bold">\u2501\u2501</span> Fire Perimeters (2016\u2013Present)<br>',
         "Fault Lines": '<span style="color:red;font-weight:bold">\u2501\u2501</span> Fault Lines<br><span style="font-size:11px;color:#888;font-style:italic;display:block;margin-top:2px;">Hover over a fault line for details</span>',
-        "Montecito 2018 Debris Flow": '<span style="background:red;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #999;vertical-align:middle;opacity:0.7;"></span>Montecito 2018 Debris Flow<br>',
         "Geology": '<hr style="margin:4px 0"><b>Geology</b><br><span style="font-size:11px;color:#888;font-style:italic;display:block;max-width:140px;word-wrap:break-word;">Hover over an area for geological details</span><br>',
         "Recorded Historical Landslides": '<hr style="margin:4px 0"><span style="background:#8856a7;display:inline-block;width:14px;height:14px;margin-right:4px;border:1px solid #4A1A6B;vertical-align:middle;opacity:0.7;"></span>Recorded Historical Landslides<br>',
+        "NLI Training Points (n=926)": '<span style="background:#e31a1c;display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;border:1px solid #999;vertical-align:middle;"></span>NLI Training Points (n=926)<br>',
         "Soil Erodibility": '<hr style="margin:4px 0"><b>Soil Erodibility</b><br><span style="font-size:11px;color:#888">Low \u2192 High (copper scale)</span><br>',
         "Precipitation Intensity": '<b>Precipitation Intensity</b><br><span style="font-size:11px;color:#888">Low \u2192 High (100-yr/24-hr, blues)</span><br>',
     }
@@ -453,7 +466,7 @@ def build_interactive_map() -> None:
         f'var _activeLayers={{"Landslide Risk":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
         'var order=["Landslide Risk","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
-        '"Montecito 2018 Debris Flow","Geology","Recorded Historical Landslides"];'
+        '"Geology","Recorded Historical Landslides","NLI Training Points (n=926)"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
         '_rebuildLegend();\n'
@@ -480,10 +493,11 @@ def build_interactive_map() -> None:
             f"var _rv=new Uint8Array(atob('{risk_b64}').split('').map(function(c){{return c.charCodeAt(0);}}) );"
             f"var _rl={{1:'Very Low',2:'Low',3:'Moderate',4:'High',5:'Very High'}};"
             f"var _rc={{1:'#1a9641',2:'#a6d96a',3:'#b8960c',4:'#fdae61',5:'#d7191c'}};"
-            f"var _fn={{slope:'slope gradient',curvature:'terrain curvature',twi:'topographic wetness',"
-            f"lithology:'geologic instability',landcover:'vegetation cover',"
-            f"fault_dist:'fault proximity',rainfall:'annual rainfall',"
-            f"ndvi:'vegetation density (NDVI)',soil:'soil erodibility'}};"
+            f"var _fn={{slope:'slope gradient',curvature:'terrain curvature',"
+            f"lithology:'geologic instability',landcover:'land cover type',"
+            f"rainfall:'extreme precipitation exposure',"
+            f"ndvi:'vegetation density (NDVI)',soil:'soil erodibility',"
+            f"burn_severity:'recent fire exposure'}};"
             f"var _fd={{}}; {fd_js}"
             f"function _gr(lat,lon){{"
             f"var c=Math.floor((lon-_rb.w)/(_rb.e-_rb.w)*_rb.pw);"
@@ -577,34 +591,81 @@ function _sa(){{
      style="display:none;position:fixed;bottom:30px;left:10px;z-index:9999;
             background:rgba(45,45,45,0.97);border-radius:8px;padding:12px 16px;
             box-shadow:0 2px 8px rgba(0,0,0,0.3);font-family:'Segoe UI',sans-serif;
-            font-size:13px;max-height:85vh;overflow-y:auto;max-width:340px;min-width:260px;">
+            font-size:13px;max-height:85vh;overflow-y:auto;max-width:360px;min-width:280px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-    <b style="font-size:14px">Data Sources</b>
+    <b style="font-size:14px">About This Tool</b>
     <span onclick="dsToggle()" style="cursor:pointer;color:#666;font-size:18px;line-height:1;">&times;</span>
   </div>
-  <p style="margin:0 0 10px;color:#444;font-size:12px;line-height:1.5;">All source datasets are listed below. Factor weights were assigned based on published landslide susceptibility literature and validated against the January 9, 2018 Montecito debris flow event. For referenced landslide literature, see the GitHub repository for this project.</p>
-  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#333;">WLC Data Sources</b>
-  <ul style="margin:4px 0 12px;padding-left:16px;line-height:1.85;color:#222;">
-    <li><b>Slope</b> &mdash; Derived from USGS 3DEP 1/3 arc-second DEM &mdash; <span style="color:#555;">Weight: 28%</span></li>
-    <li><b>Lithology / Geology</b> &mdash; USGS SGMC, supplemented by Macrostrat API &mdash; <span style="color:#555;">Weight: 18%</span></li>
-    <li><b>Topographic Wetness Index (TWI)</b> &mdash; Derived from USGS 3DEP 1/3 arc-second DEM &mdash; <span style="color:#555;">Weight: 12%</span></li>
-    <li><b>Fault Distance</b> &mdash; USGS Quaternary Fault and Fold Database &mdash; <span style="color:#555;">Weight: 12%</span></li>
-    <li><b>Land Cover</b> &mdash; USGS GAP/LANDFIRE 2011 via Microsoft Planetary Computer &mdash; <span style="color:#555;">Weight: 8%</span></li>
-    <li><b>NDVI</b> &mdash; Sentinel-2 L2A median composite via Microsoft Planetary Computer &mdash; <span style="color:#555;">Weight: 8%</span></li>
-    <li><b>Soil Erodibility</b> &mdash; USDA NRCS gSSURGO (K-factor &amp; hydrologic group) &mdash; <span style="color:#555;">Weight: 8%</span></li>
-    <li><b>Terrain Curvature</b> &mdash; Derived from USGS 3DEP 1/3 arc-second DEM &mdash; <span style="color:#555;">Weight: 3%</span></li>
-    <li><b>Precipitation</b> &mdash; NOAA Atlas 14 Vol. 1 (100-yr / 24-hr AMS) &mdash; <span style="color:#555;">Weight: 3%</span></li>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">How It Works</b>
+  <p style="margin:4px 0 10px;color:#ddd;font-size:12px;line-height:1.55;">
+    The map uses logistic regression to estimate how likely a landslide is to occur at any location
+    in Santa Barbara County. The model was trained on 926 confirmed landslide locations and ~4,600
+    comparison points, placed at least 200 meters away from any known landslide location. It uses
+    eight terrain, climate, and land condition factors to score each pixel across the county, then
+    groups those scores into five classes, from Very Low to Very High, based on where they fall in
+    the county-wide distribution.
+  </p>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Model Factors</b>
+  <p style="margin:4px 0 2px;font-size:11px;color:#999;">Factor &mdash; Data Source &mdash; LR Influence</p>
+  <ul style="margin:2px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
+    <li><b>Slope</b> &mdash; USGS 3DEP 10-m elevation data &mdash; <span style="color:#aaa;">27.5%</span></li>
+    <li><b>Precipitation</b> &mdash; NOAA Atlas 14 100-year/24-hour storm intensity &mdash; <span style="color:#aaa;">22.4%</span></li>
+    <li><b>Land Cover</b> &mdash; USGS GAP/LANDFIRE 2011 ecosystem classification &mdash; <span style="color:#aaa;">17.1%</span></li>
+    <li><b>Terrain Curvature</b> &mdash; USGS 3DEP 10-m elevation data &mdash; <span style="color:#aaa;">9.3%</span></li>
+    <li><b>Burn Severity</b> &mdash; CALFIRE perimeters, weighted by recency (3-year decay) &mdash; <span style="color:#aaa;">9.1%</span></li>
+    <li><b>Lithology</b> &mdash; USGS State Geologic Map Compilation &mdash; <span style="color:#aaa;">7.6%</span></li>
+    <li><b>Soil Erodibility</b> &mdash; USDA NRCS gSSURGO soil survey &mdash; <span style="color:#aaa;">6.7%</span></li>
+    <li><b>Vegetation Density (Normalized Difference Vegetation Index, or NDVI)</b> &mdash; Sentinel-2 satellite imagery &mdash; <span style="color:#aaa;">&lt;1%</span></li>
   </ul>
-  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#333;">Additional Data Sources</b>
-  <ul style="margin:4px 0 0;padding-left:16px;line-height:1.85;color:#222;">
-    <li><b>County Boundary</b> &mdash; U.S. Census Bureau TIGER/Line Shapefiles</li>
-    <li><b>Fire Perimeters</b> &mdash; CAL FIRE Fire and Resource Assessment Program (FRAP)</li>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Accuracy</b>
+  <p style="margin:4px 0 10px;color:#ddd;font-size:12px;line-height:1.55;">
+    Cross-validation AUC: <b>0.719</b> (1.0 = perfect, 0.5 = random). The wide variation across
+    spatial blocks (&plusmn;0.256) reflects the fact that most landslides are clustered in the
+    Santa Ynez Mountains, making performance uneven across the county.<br>
+    A random 20% of training points were held out for testing: <b>49.7%</b> fell in the High or
+    Very High class (n&nbsp;=&nbsp;185).<br>
+    For independent validation, 8,323 landslide points from the January 2023 Santa Ynez atmospheric
+    river storm (not used in training) were compared, where <b>92.8%</b> fell in High or Very High.
+  </p>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Training Data</b>
+  <ul style="margin:4px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
+    <li><b>USGS National Landslide Inventory v3</b> &mdash; 926 recorded landslide locations with Likely or High confidence ratings</li>
+  </ul>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Independent Validation</b>
+  <ul style="margin:4px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
+    <li><b>USGS 2023 Santa Ynez Mountains Inventory</b> &mdash; 8,323 landslide points from the January 9, 2023 storm event. Thomas et al., 2025, USGS data release. Not used in training.</li>
+  </ul>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Map Layers</b>
+  <ul style="margin:4px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
+    <li><b>County Boundary</b> &mdash; U.S. Census Bureau TIGER/Line</li>
+    <li><b>Fire Perimeters</b> &mdash; CAL FIRE, 2016&ndash;present</li>
     <li><b>Fault Lines</b> &mdash; USGS Quaternary Fault and Fold Database</li>
-    <li><b>Geology (display)</b> &mdash; USGS SGMC, supplemented by Macrostrat API</li>
-    <li><b>Montecito Debris Flow</b> &mdash; USGS / CGS 2018 Thomas Fire debris flow mapping</li>
-    <li><b>Recorded Historical Landslides</b> &mdash; USGS National Landslide Inventory v3 (polygon deposits)</li>
+    <li><b>Geology</b> &mdash; USGS State Geologic Map Compilation, supplemented by Macrostrat</li>
+    <li><b>Recorded Historical Landslides</b> &mdash; USGS National Landslide Inventory v3 (1,043 deposits, all confidence levels)</li>
+    <li><b>NLI Training Points</b> &mdash; The 926 landslide locations used to train this model</li>
   </ul>
-  <p style="margin:12px 0 0;font-size:11px;color:#666;text-align:center;">&copy; Ryan Green, 2026</p>
+
+  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Limitations</b>
+  <p style="margin:4px 0 10px;color:#ddd;font-size:12px;line-height:1.55;">
+    This is a broad screening tool, not a prediction of specific landslide events. Most training
+    points are concentrated in the Santa Ynez Mountains because that is where landslide mapping
+    has been done &mdash; not because other areas are definitively safe. The model reflects long-term
+    terrain conditions and does not update in real time with rainfall, soil moisture, or new fire
+    activity. Do not use this map as a substitute for on-the-ground engineering assessment.
+  </p>
+
+  <p style="margin:8px 0 4px;font-size:12px;color:#ddd;line-height:1.55;">
+    To view the code for this project, visit the
+    <a href="https://github.com/ryangreen6/landslide_suscept_SB" target="_blank"
+       style="color:#7ab3e0;">GitHub Repository</a>.
+  </p>
+  <p style="margin:4px 0 0;font-size:11px;color:#666;text-align:center;">&copy; Ryan Green, 2026</p>
 </div>
 <script>
 function dsToggle() {
@@ -627,7 +688,7 @@ function dsToggle() {
     Landslide Risk Assessment Tool for Santa Barbara County
   </b>
   <p style="margin:0;font-size:13px;color:#bbb;line-height:1.6;">
-    This tool models landslide susceptibility across Santa Barbara County using a Weighted Linear Combination (WLC) of nine geospatial factors (Info tab for details).
+    This tool models landslide susceptibility across Santa Barbara County using logistic regression trained on recorded landslide locations and eight geospatial factors. Click the Info button for methods and data sources.
   </p>
 </div>
 <script>
@@ -704,8 +765,8 @@ window.addEventListener('load', function() {
     'Fire Perimeters (2016\u2013Present)': false,
     'Fault Lines': false,
     'Geology': false,
-    'Montecito 2018 Debris Flow': false,
     'Recorded Historical Landslides': false,
+    'NLI Training Points (n=926)': false,
   };
   var ctrl = document.querySelector('.leaflet-control-layers');
   if (!ctrl) return;

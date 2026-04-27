@@ -1,30 +1,78 @@
 {
-  "wlc_jenks_breaks": [
-    0.0,
-    0.15,
-    0.24,
-    0.3,
-    0.38,
-    1.0
-  ],
-  "wlc_weights": {
-    "slope": 0.28,
-    "curvature": 0.03,
-    "twi": 0.12,
-    "lithology": 0.18,
-    "landcover": 0.08,
-    "fault_distance": 0.12,
-    "rainfall": 0.03,
-    "ndvi": 0.08,
-    "soil": 0.08
-  },
-  "montecito_validation": {
-    "wlc": {
-      "Very Low": 0.0,
-      "Low": 0.06,
-      "Moderate": 20.81,
-      "High": 73.13,
-      "Very High": 6.0
+  "logistic_regression": {
+    "n_presences": 926,
+    "n_pseudo_absences": 4621,
+    "cv_auc_mean": 0.7188,
+    "cv_auc_std": 0.2556,
+    "n_cv_blocks": 7,
+    "lr_breaks": [
+      0.0,
+      0.09890698939561843,
+      0.14459511637687683,
+      0.2155604749917983,
+      0.3169050455093383,
+      1.0
+    ],
+    "high_plus_very_high_pct": 49.73,
+    "hit_rate_by_class": {
+      "Very Low": 4.32,
+      "Low": 17.84,
+      "Moderate": 28.11,
+      "High": 24.32,
+      "Very High": 25.41
+    },
+    "coefficients": [
+      {
+        "factor": "slope",
+        "lr_coefficient": 0.507,
+        "lr_normalized_weight": 0.2753
+      },
+      {
+        "factor": "rainfall",
+        "lr_coefficient": 0.4128,
+        "lr_normalized_weight": 0.2242
+      },
+      {
+        "factor": "landcover",
+        "lr_coefficient": 0.3144,
+        "lr_normalized_weight": 0.1707
+      },
+      {
+        "factor": "curvature",
+        "lr_coefficient": 0.1723,
+        "lr_normalized_weight": 0.0935
+      },
+      {
+        "factor": "burn_severity",
+        "lr_coefficient": 0.1686,
+        "lr_normalized_weight": 0.0915
+      },
+      {
+        "factor": "lithology",
+        "lr_coefficient": 0.1401,
+        "lr_normalized_weight": 0.0761
+      },
+      {
+        "factor": "soil",
+        "lr_coefficient": -0.1226,
+        "lr_normalized_weight": 0.0666
+      },
+      {
+        "factor": "ndvi",
+        "lr_coefficient": -0.0039,
+        "lr_normalized_weight": 0.0021
+      }
+    ],
+    "santa_ynez_2023_external_validation": {
+      "n_points": 8323,
+      "high_plus_very_high_pct": 92.76,
+      "hit_rate_by_class": {
+        "Very Low": 0.34,
+        "Low": 1.38,
+        "Moderate": 5.51,
+        "High": 16.48,
+        "Very High": 76.28
+      }
     }
   }
 }

@@ -22,6 +22,8 @@ Usage
     python scripts/03_factor_layers.py
 """
 
+from __future__ import annotations
+
 import sys
 from io import StringIO
 from pathlib import Path
@@ -522,6 +524,81 @@ def build_road_distance_risk(ref_path: Path) -> None:
     logger.info("  Road distance risk saved → %s", config.ROAD_DIST_RISK_TIF)
 
 
+# ── Factor: Burn Severity (recency-weighted fire exposure) ───────────────────
+
+def build_burn_severity_layer(ref_path: Path) -> None:
+    if config.BURN_SEVERITY_TIF.exists():
+        logger.info("  Using cached burn severity raster → %s", config.BURN_SEVERITY_TIF)
+        return
+
+    from rasterio.features import rasterize as _rasterize
+
+    fire_shp = config.PROCESSED_DIR / "fire_perimeters_utm.shp"
+    if not fire_shp.exists():
+        if not config.FIRE_PERIMETERS_SHP.exists():
+            logger.warning("Burn severity layer skipped — fire perimeters not found")
+            dem, profile = utils.read_raster(ref_path)
+            utils.write_raster(
+                np.where(np.isfinite(dem), 0.0, np.nan).astype(np.float32),
+                profile, config.BURN_SEVERITY_TIF,
+            )
+            return
+        fires_raw = gpd.read_file(config.FIRE_PERIMETERS_SHP).to_crs(config.CRS_ANALYSIS)
+        county = gpd.read_file(config.COUNTY_UTM_SHP)
+        fires_raw = gpd.clip(fires_raw, county)
+        fires_raw.to_file(fire_shp)
+        fires = fires_raw
+    else:
+        fires = gpd.read_file(fire_shp)
+
+    logger.info("Building burn severity layer from %d fire perimeters …", len(fires))
+
+    year_col = next(
+        (c for c in ["YEAR_", "FIRE_YEAR", "year_", "YEAR"] if c in fires.columns), None
+    )
+    if year_col is None:
+        logger.warning("  No year column found — skipping burn severity")
+        dem, profile = utils.read_raster(ref_path)
+        utils.write_raster(
+            np.where(np.isfinite(dem), 0.0, np.nan).astype(np.float32),
+            profile, config.BURN_SEVERITY_TIF,
+        )
+        return
+
+    dem, profile = utils.read_raster(ref_path)
+    height, width = dem.shape
+    with rasterio.open(ref_path) as ref:
+        transform = ref.transform
+
+    fires = fires.copy()
+    fires["_year"] = pd.to_numeric(fires[year_col], errors="coerce")
+    fires = fires.dropna(subset=["_year"])
+    fires["_year"] = fires["_year"].astype(int)
+
+    fire_year_arr = np.zeros((height, width), dtype=np.float32)
+    for year, grp in fires.sort_values("_year").groupby("_year"):
+        yr_raster = _rasterize(
+            [(geom, float(year)) for geom in grp.geometry if geom is not None],
+            out_shape=(height, width),
+            transform=transform,
+            fill=0.0,
+            dtype=np.float32,
+        )
+        fire_year_arr = np.where(yr_raster > 0, yr_raster, fire_year_arr)
+
+    burned = fire_year_arr > 0
+    years_since = np.where(burned, 2024.0 - fire_year_arr, 0.0)
+    decay = np.where(burned, np.exp(-years_since / 3.0), 0.0).astype(np.float32)
+    decay = np.where(np.isfinite(dem), decay, np.nan)
+
+    utils.write_raster(decay, profile, config.BURN_SEVERITY_TIF)
+    logger.info(
+        "  Burn severity saved → %s  (burned: %.1f%% of county)",
+        config.BURN_SEVERITY_TIF,
+        100.0 * burned.sum() / np.isfinite(dem).sum(),
+    )
+
+
 # ── Normalise All Layers ──────────────────────────────────────────────────────
 
 def normalise_all_layers() -> None:
@@ -568,6 +645,14 @@ def normalise_all_layers() -> None:
     else:
         logger.warning("  Skipping ndvi — source not found")
 
+    if config.BURN_SEVERITY_TIF.exists():
+        burn, profile = utils.read_raster(config.BURN_SEVERITY_TIF)
+        burn_norm = utils.normalize_to_01(burn)
+        utils.write_raster(burn_norm, profile, config.NORM_BURN_TIF)
+        logger.info("  burn_severity normalised → %s", config.NORM_BURN_TIF.name)
+    else:
+        logger.warning("  Skipping burn_severity — source not found")
+
     logger.info("Normalisation complete.")
 
 
@@ -601,6 +686,7 @@ def main() -> None:
     build_precipitation_layer(ref_path)
     build_ndvi_layer(ref_path)
     build_soil_risk(ref_path)
+    build_burn_severity_layer(ref_path)
     normalise_all_layers()
 
     expected = [
@@ -608,6 +694,7 @@ def main() -> None:
         config.NORM_LITHOLOGY_TIF, config.NORM_LANDCOVER_TIF,
         config.NORM_FAULT_TIF, config.NORM_PRECIP_TIF,
         config.NORM_NDVI_TIF, config.NORM_SOIL_TIF, config.NORM_ROAD_TIF,
+        config.NORM_BURN_TIF,
     ]
     missing = [p for p in expected if not p.exists()]
     if missing:
