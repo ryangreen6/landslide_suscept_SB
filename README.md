@@ -75,18 +75,6 @@ Each fire polygon is assigned a recency weight using exponential decay: `exp(-(2
 
 ---
 
-## Susceptibility Classes
-
-| Class | Label | Color |
-|---|---|---|
-| 1 | Very Low | `#1a9641` |
-| 2 | Low | `#a6d96a` |
-| 3 | Moderate | `#ffffbf` |
-| 4 | High | `#fdae61` |
-| 5 | Very High | `#d7191c` |
-
----
-
 ## Input Data Sources
 
 | Dataset | Source |
@@ -122,6 +110,14 @@ data/raw/
 ├── gSSURGO_CA.gdb                ← USDA NRCS gSSURGO geodatabase
 └── santa_ynez_mountains_2023/    ← USGS 2023 landslide inventory CSV (external validation)
 ```
+
+---
+
+## Citations
+
+Thomas, M.A., Lindsay, D.N., Graber, A.P., Rossi, R.K., Kostelnik, J., Rengers, F.K., Kean, J.W., Schwartz, J.Y., Swanson, B.J., Oakley, N.S., Richardson, P.W., Morelan, A.E., Ritchie, A.C., Warrick, J.A., Rotche, L.L., Penserini, B.D., and Slaughter, S.L., 2025, Landslide, soil, and vegetation measurements following an atmospheric river storm on January 9, 2023, in the Santa Ynez Mountains, California, USA: U.S. Geological Survey data release. https://doi.org/10.5066/P133CHYQ
+
+Kean, J.W., Staley, D.M., Lancaster, J.T., Rengers, F.K., Swanson, B.J., Coe, J.A., Hernandez, J.L., Sigman, A.J., Allstadt, K.E., and Lindsay, D.N., 2019, Inundation, flow dynamics, and damage in the 9 January 2018 Montecito debris-flow event, California, USA: Geosphere, v. 15, no. 4, p. 1140–1163. https://doi.org/10.1130/GES02040.1
 
 ---
 
