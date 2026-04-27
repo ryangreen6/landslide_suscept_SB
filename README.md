@@ -1,14 +1,14 @@
 # Landslide Susceptibility Mapping — Santa Barbara County
 
-A geospatial pipeline to produce landslide susceptibility maps for Santa Barbara County, California, using a Weighted Linear Combination (WLC) of nine terrain, geology, and environmental factors.
+A geospatial pipeline that models landslide susceptibility across Santa Barbara County, California using logistic regression trained on recorded landslide locations and eight terrain, climate, and land condition factors.
 
 ---
 
 ## Motivation
 
-On **January 9, 2018**, a catastrophic debris flow struck Montecito, California, killing 23 people and destroying over 100 homes. The event was directly triggered by an intense rainfall storm (0.5 inches in 5 minutes) falling on steep slopes recently denuded by the **Thomas Fire** — which burned 281,893 acres across Ventura and Santa Barbara counties in December 2017.
+On January 9, 2018, a catastrophic debris flow struck Montecito, California, killing 23 people and destroying over 100 homes. The event was triggered by intense rainfall falling on steep slopes recently burned by the Thomas Fire, which scorched 281,893 acres across Ventura and Santa Barbara counties in December 2017.
 
-This project builds a reproducible, data-driven susceptibility model that incorporates fire history as a mechanistically central factor, explicitly validates against the Montecito debris flow, and demonstrates how spatial analysis can support hazard planning in fire-prone regions.
+This project builds a reproducible, data-driven susceptibility model that incorporates fire history as a core factor, validates against an independent landslide inventory, and demonstrates how spatial analysis can support hazard planning in fire-prone regions.
 
 ---
 
@@ -24,70 +24,54 @@ Santa Barbara County, California (EPSG:26911 — UTM Zone 11N)
 ## Methodology
 
 ```
-Raw Data (9 layers)
+Raw Data (8 factor layers)
       ↓
-01_data_prep.py        ← Mosaic, reproject, clip, align to 10 m UTM grid
+01_data_prep.py        ← Mosaic DEM tiles, reproject, clip, align to 10 m UTM grid
       ↓
 02_terrain_analysis.py ← Slope, aspect, curvature, TWI, flow accumulation
       ↓
-03_factor_layers.py    ← Lithology risk, land cover risk, fault distance,
-                          precipitation, NDVI, soil erodibility
-                          + normalise all layers → [0, 1]
+03_factor_layers.py    ← Lithology risk, land cover risk, precipitation,
+                          NDVI, soil erodibility, burn severity
+                          + normalize all layers → [0, 1]
       ↓
-04_modeling.py         ← Weighted Linear Combination (WLC)
-                          Fixed classification breaks (literature-calibrated)
-                          Montecito 2018 validation
+04_modeling.py         ← Logistic regression (presence / pseudo-absence)
+                          Spatial block cross-validation
+                          Percentile-based classification
+                          External validation against 2023 Santa Ynez inventory
       ↓
-05_visualization.py    ← Static figures + interactive Folium HTML map
+05_visualization.py    ← Interactive Folium HTML map
 ```
 
-**WLC Model:** Nine normalized factor rasters are multiplied by literature-derived weights and summed to produce a continuous susceptibility index (0–1). The index is classified into five levels using fixed breaks calibrated against the January 9, 2018 Montecito debris flow event. Weights were assigned based on published landslide susceptibility literature.
+### Model
 
-| Factor | Weight |
-|---|---|
-| Slope | 28% |
-| Lithology | 18% |
-| Topographic Wetness Index (TWI) | 12% |
-| Fault Distance | 12% |
-| Land Cover | 8% |
-| NDVI | 8% |
-| Soil Erodibility | 8% |
-| Terrain Curvature | 3% |
-| Precipitation | 3% |
+The model uses logistic regression in a presence/pseudo-absence framework. Training presences are 926 polygon centroids from the USGS National Landslide Inventory v3 (Confidence ≥ 3, meaning Likely or High confidence). Pseudo-absences are ~4,600 points drawn randomly from land pixels at least 200 m away from any known landslide location, at a 5:1 ratio to presences.
 
----
+The modeled probability of landslide occurrence is classified into five levels using percentile breaks on the county-wide land pixel distribution (bottom 30% / 30–50 / 50–70 / 70–85 / top 15%). Topographic Wetness Index (TWI) is excluded due to collinearity with slope. Fault proximity is excluded as a trigger factor rather than an inherent terrain property.
 
-## Input Data Sources
+### Model Factors
 
-| Dataset | Source |
-|---|---|
-| 1/3 arc-second 3DEP DEM | USGS National Map |
-| California Geology (SGMC) | USGS National Geologic Map Database |
-| Geology (supplemental) | Macrostrat API |
-| GAP/LANDFIRE Land Cover 2011 | USGS via Microsoft Planetary Computer |
-| Historical Landslide Inventory | California Geological Survey (CaLSI) |
-| Quaternary Faults | USGS Earthquake Hazards Program |
-| NOAA Atlas 14 Precipitation | NOAA (100-yr / 24-hr AMS) |
-| CAL FIRE Perimeters | CAL FIRE FRAP |
-| Sentinel-2 NDVI | Microsoft Planetary Computer |
-| Soil Erodibility (gSSURGO) | USDA NRCS |
-| Montecito Debris Flow | CGS / USGS publications |
-| Santa Barbara County Boundary | U.S. Census Bureau TIGER/Line |
+| Factor | Data Source | LR Influence |
+|---|---|---|
+| Slope | USGS 3DEP 10-m DEM | 27.5% |
+| Precipitation | NOAA Atlas 14 (100-yr/24-hr AMS) | 22.4% |
+| Land Cover | USGS GAP/LANDFIRE 2011 | 17.1% |
+| Terrain Curvature | USGS 3DEP 10-m DEM | 9.3% |
+| Burn Severity | CAL FIRE FRAP, recency-weighted (3-yr decay) | 9.1% |
+| Lithology | USGS State Geologic Map Compilation | 7.6% |
+| Soil Erodibility | USDA NRCS gSSURGO | 6.7% |
+| NDVI | ESA Sentinel-2 L2A via Microsoft Planetary Computer | <1% |
 
-### Montecito Debris Flow Polygon
+### Burn Severity
 
-The January 9, 2018 debris flow extent polygon can be obtained from:
-- USGS Open-File Report 2019–1204 (Kean et al.)
-- California Geological Survey Special Report 237
-- Supplement to Warrick et al. (2019) *Nature Geoscience*
-
-Place the shapefile at: `data/raw/montecito_debris_flow/montecito_2018_debris_flow.shp`
+Each fire polygon is assigned a recency weight using exponential decay: `exp(-(2024 - fire_year) / 3)`. This gives more recent fires a higher weight, reflecting the elevated debris flow risk that persists for several years after a burn. Pixels are assigned the weight of the most recent fire that burned them; unburned pixels receive a weight of 0.
 
 ---
 
-## Fire History Note
+## Performance
 
-The **Thomas Fire** (December 4–January 12, 2017–2018) must be present in the CAL FIRE perimeters dataset as `FIRE_NAME = "THOMAS"`. Relative to the January 9, 2018 reference date, it falls in the "< 1 year" burn category — the highest risk class (score = 5) — correctly reflecting the active hydrophobic soil layer and near-total vegetation loss that made the Montecito slopes so vulnerable.
+- **Cross-validation AUC: 0.719 ± 0.256** (7 spatial blocks, leave-one-block-out). High variance reflects spatial clustering of landslides in the Santa Ynez Mountains.
+- **Hold-out hit rate: 49.7%** of withheld NLI centroids (random 20%, n = 185) fell in the High or Very High class.
+- **External validation: 92.8%** of 8,323 landslide points from the January 9, 2023 Santa Ynez atmospheric river storm fell in High or Very High — this dataset was not used in training.
 
 ---
 
@@ -103,22 +87,40 @@ The **Thomas Fire** (December 4–January 12, 2017–2018) must be present in th
 
 ---
 
+## Input Data Sources
+
+| Dataset | Source |
+|---|---|
+| 1/3 arc-second 3DEP DEM | USGS National Map |
+| California Geology (SGMC) | USGS National Geologic Map Database |
+| Geology (supplemental) | Macrostrat API |
+| GAP/LANDFIRE Land Cover 2011 | USGS via Microsoft Planetary Computer |
+| USGS National Landslide Inventory v3 | USGS National Landslide Hazards Program |
+| USGS 2023 Santa Ynez Mountains Inventory | Thomas et al., 2025, USGS data release |
+| Quaternary Faults | USGS Earthquake Hazards Program |
+| NOAA Atlas 14 Precipitation | NOAA (100-yr / 24-hr AMS) |
+| CAL FIRE Perimeters | CAL FIRE FRAP |
+| Sentinel-2 NDVI | ESA via Microsoft Planetary Computer |
+| Soil Erodibility (gSSURGO) | USDA NRCS |
+| Santa Barbara County Boundary | U.S. Census Bureau TIGER/Line |
+
+---
+
 ## Data Download
 
-Download all datasets listed in the table above and place them in `data/raw/` following the expected directory structure in `src/config.py`. The pipeline will fail with clear error messages if any required file is missing.
+Download the datasets above and place them in `data/raw/` following the directory structure defined in `src/config.py`. The pipeline will fail with clear error messages if any required file is missing.
 
-Key paths to populate:
 ```
 data/raw/
-├── dem_tiles/              ← 1/3 arc-sec 3DEP tiles from USGS National Map
-├── sb_county_boundary/     ← County boundary shapefile
-├── ca_geology/             ← USGS SGMC California geology shapefile
-├── landslide_inventory/    ← CGS CaLSI landslide inventory shapefile
-├── quaternary_faults/      ← USGS Quaternary faults shapefile
-├── atlas_14/               ← NOAA Atlas 14 100-yr/24-hr precipitation raster
-├── fire_perimeters/        ← CAL FIRE all-years perimeters shapefile
-├── gSSURGO_CA.gdb          ← USDA NRCS gSSURGO geodatabase
-└── montecito_debris_flow/  ← 2018 Montecito debris flow polygon
+├── dem_tiles/                    ← 1/3 arc-sec 3DEP tiles from USGS National Map
+├── sb_county_boundary/           ← County boundary shapefile
+├── ca_geology/                   ← USGS SGMC California geology shapefile
+├── landslide_inventory/          ← USGS NLI v3 shapefile
+├── quaternary_faults/            ← USGS Quaternary faults shapefile
+├── atlas_14/                     ← NOAA Atlas 14 100-yr/24-hr precipitation raster
+├── fire_perimeters/              ← CAL FIRE all-years perimeters shapefile
+├── gSSURGO_CA.gdb                ← USDA NRCS gSSURGO geodatabase
+└── santa_ynez_mountains_2023/    ← USGS 2023 landslide inventory CSV (external validation)
 ```
 
 ---
