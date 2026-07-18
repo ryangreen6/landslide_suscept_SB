@@ -147,6 +147,29 @@ def build_interactive_map() -> None:
                        plt.get_cmap("Blues"), mcolors.Normalize(0, 1),
                        opacity=0.6, show=False, clip_to_county=True)
 
+    if config.SLOPE_UNITS_GEOJSON.exists():
+        import json as _json_su
+        with open(config.SLOPE_UNITS_GEOJSON) as _f:
+            _su_data = _json_su.load(_f)
+        _su_grp = folium.FeatureGroup(name="Landslide Risk (Slope Units)", show=False)
+        _su_colors = config.SUSCEPTIBILITY_COLORS
+        folium.GeoJson(
+            _su_data,
+            style_function=lambda feat: {
+                "fillColor": _su_colors.get(feat["properties"].get("susc_class", 0), "#888"),
+                "color":     _su_colors.get(feat["properties"].get("susc_class", 0), "#888"),
+                "weight": 0.3,
+                "fillOpacity": 0.65,
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["susc_label", "probability"],
+                aliases=["Susceptibility:", "LR Probability:"],
+                style="font-size:13px;",
+            ),
+        ).add_to(_su_grp)
+        _su_grp.add_to(m)
+        logger.info("  Added slope unit overlay (%d units)", len(_su_data["features"]))
+
     risk_bounds = None
     risk_b64 = None
     if config.SUSCEPTIBILITY_LR_TIF.exists():
@@ -448,6 +471,7 @@ def build_interactive_map() -> None:
     )
     _leg_sections = {
         "Landslide Risk": f'<b style="font-size:14px">Landslide Risk</b><br>{risk_rows_flat}',
+        "Landslide Risk (Slope Units)": f'<b style="font-size:14px">Landslide Risk (Slope Units)</b><br>{risk_rows_flat}',
         "Fire Perimeters (2016\u2013Present)": '<hr style="margin:4px 0"><span style="color:darkorange;font-weight:bold">\u2501\u2501</span> Fire Perimeters (2016\u2013Present)<br>',
         "Fault Lines": '<span style="color:red;font-weight:bold">\u2501\u2501</span> Fault Lines<br><span style="font-size:11px;color:#888;font-style:italic;display:block;margin-top:2px;">Hover over a fault line for details</span>',
         "Geology": '<hr style="margin:4px 0"><b>Geology</b><br><span style="font-size:11px;color:#888;font-style:italic;display:block;max-width:140px;word-wrap:break-word;">Hover over an area for geological details</span><br>',
@@ -465,7 +489,7 @@ def build_interactive_map() -> None:
         f'<script>\n{legend_sections_js}\n'
         f'var _activeLayers={{"Landslide Risk":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
-        'var order=["Landslide Risk","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
+        'var order=["Landslide Risk","Landslide Risk (Slope Units)","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
         '"Geology","Recorded Historical Landslides","NLI Training Points (n=926)"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
@@ -757,8 +781,10 @@ hr { border-color:#555 !important; }
     default_layers_html = """
 <script>
 window.addEventListener('load', function() {
+  var _riskNames = ['Landslide Risk', 'Landslide Risk (Slope Units)'];
   var _defaults = {
     'Landslide Risk': true,
+    'Landslide Risk (Slope Units)': false,
     'Soil Erodibility': false,
     'Precipitation Intensity': false,
     'SB County Boundary': true,
@@ -803,13 +829,43 @@ window.addEventListener('load', function() {
   var overlaysDiv = ctrl.querySelector('.leaflet-control-layers-overlays');
   if (overlaysDiv) {
     var allLabels = Array.from(overlaysDiv.querySelectorAll('label'));
-    var topLabels = allLabels.filter(function(l) {
-      var s = l.querySelector('span'); return s && !!_defaults[s.textContent.trim()];
+    var riskLabels = allLabels.filter(function(l) {
+      var s = l.querySelector('span');
+      return s && _riskNames.indexOf(s.textContent.trim()) >= 0;
     });
-    var restLabels = allLabels.filter(function(l) {
-      var s = l.querySelector('span'); return !s || !_defaults[s.textContent.trim()];
+    var otherLabels = allLabels.filter(function(l) {
+      var s = l.querySelector('span');
+      return !s || _riskNames.indexOf(s.textContent.trim()) < 0;
     });
-    topLabels.concat(restLabels).forEach(function(l) { overlaysDiv.appendChild(l); });
+
+    overlaysDiv.innerHTML = '';
+
+    var riskHdr = document.createElement('div');
+    riskHdr.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
+      + 'color:#888;margin:2px 0 4px;';
+    riskHdr.textContent = 'Risk Model';
+    overlaysDiv.appendChild(riskHdr);
+    riskLabels.forEach(function(l) { overlaysDiv.appendChild(l); });
+
+    var otherHdr = document.createElement('div');
+    otherHdr.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
+      + 'color:#888;margin:8px 0 4px;padding-top:8px;border-top:1px solid #555;';
+    otherHdr.textContent = 'Other Layers';
+    overlaysDiv.appendChild(otherHdr);
+    otherLabels.forEach(function(l) { overlaysDiv.appendChild(l); });
+
+    riskLabels.forEach(function(label) {
+      var cb = label.querySelector('input[type=checkbox]');
+      if (!cb) return;
+      cb.addEventListener('change', function() {
+        if (this.checked) {
+          riskLabels.forEach(function(other) {
+            var ocb = other.querySelector('input[type=checkbox]');
+            if (ocb && ocb !== cb && ocb.checked) ocb.click();
+          });
+        }
+      });
+    });
   }
 
   var sep = document.createElement('div');

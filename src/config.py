@@ -88,7 +88,9 @@ SUSCEPTIBILITY_LR_PROB_TIF = OUTPUTS_DIR / "susceptibility_lr_probability.tif"
 LR_COEFFICIENTS_CSV        = OUTPUTS_DIR / "lr_coefficients.csv"
 LR_VALIDATION_CSV          = OUTPUTS_DIR / "lr_validation.csv"
 
-INTERACTIVE_HTML  = OUTPUTS_DIR / "susceptibility_interactive.html"
+INTERACTIVE_HTML     = OUTPUTS_DIR / "susceptibility_interactive.html"
+SLOPE_UNITS_GPKG     = PROCESSED_DIR / "slope_units.gpkg"
+SLOPE_UNITS_GEOJSON  = OUTPUTS_DIR / "slope_units_classified.geojson"
 
 # ── Susceptibility Class Colors & Labels ──────────────────────────────────────
 SUSCEPTIBILITY_COLORS = {
