@@ -137,9 +137,6 @@ def build_interactive_map() -> None:
         ).add_to(m)
         logger.info("  Added raster overlay: %s", layer_name)
 
-    _raster_to_overlay(config.SUSCEPTIBILITY_LR_TIF,
-                       "Landslide Risk", SUSC_CMAP, SUSC_NORM, opacity=0.55, clip_to_county=True)
-
     _raster_to_overlay(config.NORM_SOIL_TIF, "Soil Erodibility",
                        plt.get_cmap("copper"), mcolors.Normalize(0, 1),
                        opacity=0.6, show=False)
@@ -470,8 +467,7 @@ def build_interactive_map() -> None:
         for cls, color in MACRO_CLASS_COLORS.items()
     )
     _leg_sections = {
-        "Landslide Risk": f'<b style="font-size:14px">Landslide Risk</b><br>{risk_rows_flat}',
-        "Landslide Risk (Slope Units)": f'<b style="font-size:14px">Landslide Risk (Slope Units)</b><br>{risk_rows_flat}',
+        "Landslide Risk (Slope Units)": f'<b style="font-size:14px">Landslide Risk</b><br>{risk_rows_flat}',
         "Fire Perimeters (2016\u2013Present)": '<hr style="margin:4px 0"><span style="color:darkorange;font-weight:bold">\u2501\u2501</span> Fire Perimeters (2016\u2013Present)<br>',
         "Fault Lines": '<span style="color:red;font-weight:bold">\u2501\u2501</span> Fault Lines<br><span style="font-size:11px;color:#888;font-style:italic;display:block;margin-top:2px;">Hover over a fault line for details</span>',
         "Geology": '<hr style="margin:4px 0"><b>Geology</b><br><span style="font-size:11px;color:#888;font-style:italic;display:block;max-width:140px;word-wrap:break-word;">Hover over an area for geological details</span><br>',
@@ -487,9 +483,9 @@ def build_interactive_map() -> None:
         'box-shadow:0 2px 8px rgba(0,0,0,0.3);font-family:\'Segoe UI\',sans-serif;'
         'font-size:15px;max-height:80vh;overflow-y:auto;"></div>\n'
         f'<script>\n{legend_sections_js}\n'
-        f'var _activeLayers={{"Landslide Risk":true}};\n'
+        f'var _activeLayers={{"Landslide Risk (Slope Units)":true}};\n'
         'function _rebuildLegend(){var el=document.getElementById(\'map-legend\');if(!el)return;'
-        'var order=["Landslide Risk","Landslide Risk (Slope Units)","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
+        'var order=["Landslide Risk (Slope Units)","Soil Erodibility","Precipitation Intensity","Fire Perimeters (2016\u2013Present)","Fault Lines",'
         '"Geology","Recorded Historical Landslides","NLI Training Points (n=926)"];'
         'var html=\'\';order.forEach(function(k){if(_activeLayers[k]&&_legendSections[k])html+=_legendSections[k];});'
         'el.innerHTML=html||\'<i style="color:#888">No active layers</i>\';}\n'
@@ -621,16 +617,6 @@ function _sa(){{
     <span onclick="dsToggle()" style="cursor:pointer;color:#666;font-size:18px;line-height:1;">&times;</span>
   </div>
 
-  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">How It Works</b>
-  <p style="margin:4px 0 10px;color:#ddd;font-size:12px;line-height:1.55;">
-    The map uses logistic regression to estimate how likely a landslide is to occur at any location
-    in Santa Barbara County. The model was trained on 926 confirmed landslide locations and ~4,600
-    comparison points, placed at least 200 meters away from any known landslide location. It uses
-    eight terrain, climate, and land condition factors to score each pixel across the county, then
-    groups those scores into five classes, from Very Low to Very High, based on where they fall in
-    the county-wide distribution.
-  </p>
-
   <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Model Factors</b>
   <p style="margin:4px 0 2px;font-size:11px;color:#999;">Factor &mdash; Data Source &mdash; LR Influence</p>
   <ul style="margin:2px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
@@ -643,17 +629,6 @@ function _sa(){{
     <li><b>Soil Erodibility</b> &mdash; USDA NRCS gSSURGO soil survey &mdash; <span style="color:#aaa;">6.7%</span></li>
     <li><b>Vegetation Density (Normalized Difference Vegetation Index, or NDVI)</b> &mdash; Sentinel-2 satellite imagery &mdash; <span style="color:#aaa;">&lt;1%</span></li>
   </ul>
-
-  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Accuracy</b>
-  <p style="margin:4px 0 10px;color:#ddd;font-size:12px;line-height:1.55;">
-    Cross-validation AUC: <b>0.719</b> (1.0 = perfect, 0.5 = random). The wide variation across
-    spatial blocks (&plusmn;0.256) reflects the fact that most landslides are clustered in the
-    Santa Ynez Mountains, making performance uneven across the county.<br>
-    A random 20% of training points were held out for testing: <b>49.7%</b> fell in the High or
-    Very High class (n&nbsp;=&nbsp;185).<br>
-    For independent validation, 8,323 landslide points from the January 2023 Santa Ynez atmospheric
-    river storm (not used in training) were compared, where <b>92.8%</b> fell in High or Very High.
-  </p>
 
   <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Training Data</b>
   <ul style="margin:4px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
@@ -674,15 +649,6 @@ function _sa(){{
     <li><b>Recorded Historical Landslides</b> &mdash; USGS National Landslide Inventory v3 (1,043 deposits, all confidence levels)</li>
     <li><b>NLI Training Points</b> &mdash; The 926 landslide locations used to train this model</li>
   </ul>
-
-  <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Limitations</b>
-  <p style="margin:4px 0 10px;color:#ddd;font-size:12px;line-height:1.55;">
-    This is a broad screening tool, not a prediction of specific landslide events. Most training
-    points are concentrated in the Santa Ynez Mountains because that is where landslide mapping
-    has been done &mdash; not because other areas are definitively safe. The model reflects long-term
-    terrain conditions and does not update in real time with rainfall, soil moisture, or new fire
-    activity. Do not use this map as a substitute for on-the-ground engineering assessment.
-  </p>
 
   <p style="margin:8px 0 4px;font-size:12px;color:#ddd;line-height:1.55;">
     To view the code for this project, visit the
@@ -712,7 +678,7 @@ function dsToggle() {
     Landslide Risk Assessment Tool for Santa Barbara County
   </b>
   <p style="margin:0;font-size:13px;color:#bbb;line-height:1.6;">
-    This tool models landslide susceptibility across Santa Barbara County using logistic regression trained on recorded landslide locations and eight geospatial factors. Click the Info button for methods and data sources.
+    This tool models landslide susceptibility across Santa Barbara County using logistic regression trained on recorded landslide locations and eight geospatial factors. Click the Info button for data sources.
   </p>
 </div>
 <script>
@@ -724,9 +690,13 @@ window.addEventListener('load', function() {
     banner.style.maxWidth = 'none';
   }
   setTimeout(function() {
-    document.addEventListener('click', function() {
-      if (banner) banner.style.display = 'none';
-    }, {once: true});
+    function _dismissBanner(e) {
+      if (e.isTrusted && banner) {
+        banner.style.display = 'none';
+        document.removeEventListener('click', _dismissBanner);
+      }
+    }
+    document.addEventListener('click', _dismissBanner);
   }, 300);
 });
 </script>
@@ -781,10 +751,9 @@ hr { border-color:#555 !important; }
     default_layers_html = """
 <script>
 window.addEventListener('load', function() {
-  var _riskNames = ['Landslide Risk', 'Landslide Risk (Slope Units)'];
+  var _riskNames = ['Landslide Risk (Slope Units)'];
   var _defaults = {
-    'Landslide Risk': true,
-    'Landslide Risk (Slope Units)': false,
+    'Landslide Risk (Slope Units)': true,
     'Soil Erodibility': false,
     'Precipitation Intensity': false,
     'SB County Boundary': true,
@@ -807,7 +776,7 @@ window.addEventListener('load', function() {
   dlBtn.innerHTML = '&#9776; Data Layers';
   dlBtn.onclick = function() { ctrl.style.display = ''; dlBtn.style.display = 'none'; };
   document.body.appendChild(dlBtn);
-  ctrl.style.display = 'none';
+  dlBtn.style.display = 'none';
 
   var list = ctrl.querySelector('.leaflet-control-layers-list');
   if (list) {
@@ -866,6 +835,16 @@ window.addEventListener('load', function() {
         }
       });
     });
+
+    setTimeout(function() {
+      riskLabels.forEach(function(label) {
+        var s = label.querySelector('span');
+        if (s && s.textContent.trim() === 'Landslide Risk (Slope Units)') {
+          var cb = label.querySelector('input[type=checkbox]');
+          if (cb && !cb.checked) cb.click();
+        }
+      });
+    }, 300);
   }
 
   var sep = document.createElement('div');
