@@ -108,6 +108,20 @@ def main() -> None:
     clf.fit(X_scaled, y)
     logger.info("  Model trained on %d units (%d pos / %d neg)", len(train), n_pos, len(sampled_neg))
 
+    import pandas as pd
+    coef = clf.coef_[0]
+    norm_coef = np.abs(coef) / np.abs(coef).sum()
+    coef_df = pd.DataFrame({
+        "factor": feature_names,
+        "lr_coefficient": coef.round(4).tolist(),
+        "lr_normalized_weight": norm_coef.round(4).tolist(),
+    }).sort_values("lr_normalized_weight", ascending=False)
+    coef_df.to_csv(config.SU_LR_COEFFICIENTS_CSV, index=False)
+    logger.info("  Slope unit coefficients:")
+    for _, row in coef_df.iterrows():
+        logger.info("    %-18s  raw %+.3f  norm %.1f%%",
+                    row["factor"], row["lr_coefficient"], row["lr_normalized_weight"] * 100)
+
     all_X = slope_units[feature_names].values.astype(np.float32)
     has_data = np.any(np.isfinite(all_X), axis=1)
     prob = np.full(len(slope_units), np.nan)

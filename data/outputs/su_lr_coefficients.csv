@@ -1,0 +1,9 @@
+factor,lr_coefficient,lr_normalized_weight
+rainfall,0.6164,0.264
+landcover,0.6109,0.2616
+burn_severity,0.4688,0.2007
+soil,0.279,0.1195
+curvature,-0.1692,0.0725
+slope,-0.0973,0.0417
+lithology,0.0919,0.0394
+ndvi,0.0017,0.0007

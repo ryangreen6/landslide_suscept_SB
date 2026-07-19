@@ -89,8 +89,9 @@ LR_COEFFICIENTS_CSV        = OUTPUTS_DIR / "lr_coefficients.csv"
 LR_VALIDATION_CSV          = OUTPUTS_DIR / "lr_validation.csv"
 
 INTERACTIVE_HTML     = OUTPUTS_DIR / "susceptibility_interactive.html"
-SLOPE_UNITS_GPKG     = PROCESSED_DIR / "slope_units.gpkg"
-SLOPE_UNITS_GEOJSON  = OUTPUTS_DIR / "slope_units_classified.geojson"
+SLOPE_UNITS_GPKG        = PROCESSED_DIR / "slope_units.gpkg"
+SLOPE_UNITS_GEOJSON     = OUTPUTS_DIR / "slope_units_classified.geojson"
+SU_LR_COEFFICIENTS_CSV  = OUTPUTS_DIR / "su_lr_coefficients.csv"
 
 # ── Susceptibility Class Colors & Labels ──────────────────────────────────────
 SUSCEPTIBILITY_COLORS = {

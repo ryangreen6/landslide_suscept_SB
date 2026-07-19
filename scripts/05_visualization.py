@@ -618,16 +618,16 @@ function _sa(){{
   </div>
 
   <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Model Factors</b>
-  <p style="margin:4px 0 2px;font-size:11px;color:#999;">Factor &mdash; Data Source &mdash; LR Influence</p>
+  <p style="margin:4px 0 2px;font-size:11px;color:#999;">Factor &mdash; Data Source</p>
   <ul style="margin:2px 0 10px;padding-left:16px;line-height:1.85;color:#ddd;">
-    <li><b>Slope</b> &mdash; USGS 3DEP 10-m elevation data &mdash; <span style="color:#aaa;">27.5%</span></li>
-    <li><b>Precipitation</b> &mdash; NOAA Atlas 14 100-year/24-hour storm intensity &mdash; <span style="color:#aaa;">22.4%</span></li>
-    <li><b>Land Cover</b> &mdash; USGS GAP/LANDFIRE 2011 ecosystem classification &mdash; <span style="color:#aaa;">17.1%</span></li>
-    <li><b>Terrain Curvature</b> &mdash; USGS 3DEP 10-m elevation data &mdash; <span style="color:#aaa;">9.3%</span></li>
-    <li><b>Burn Severity</b> &mdash; CALFIRE perimeters, weighted by recency (3-year decay) &mdash; <span style="color:#aaa;">9.1%</span></li>
-    <li><b>Lithology</b> &mdash; USGS State Geologic Map Compilation &mdash; <span style="color:#aaa;">7.6%</span></li>
-    <li><b>Soil Erodibility</b> &mdash; USDA NRCS gSSURGO soil survey &mdash; <span style="color:#aaa;">6.7%</span></li>
-    <li><b>Vegetation Density (Normalized Difference Vegetation Index, or NDVI)</b> &mdash; Sentinel-2 satellite imagery &mdash; <span style="color:#aaa;">&lt;1%</span></li>
+    <li><b>Slope</b> &mdash; USGS 3DEP 10-m elevation data</li>
+    <li><b>Precipitation</b> &mdash; NOAA Atlas 14 100-year/24-hour storm intensity</li>
+    <li><b>Land Cover</b> &mdash; USGS GAP/LANDFIRE 2011 ecosystem classification</li>
+    <li><b>Terrain Curvature</b> &mdash; USGS 3DEP 10-m elevation data</li>
+    <li><b>Burn Severity</b> &mdash; CALFIRE perimeters, weighted by recency (3-year decay)</li>
+    <li><b>Lithology</b> &mdash; USGS State Geologic Map Compilation</li>
+    <li><b>Soil Erodibility</b> &mdash; USDA NRCS gSSURGO soil survey</li>
+    <li><b>Vegetation Density (NDVI)</b> &mdash; Sentinel-2 satellite imagery</li>
   </ul>
 
   <b style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#aaa;">Training Data</b>
