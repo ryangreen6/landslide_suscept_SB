@@ -1,5 +1,6 @@
 data/raw/
 data/processed/
+data/unused_data/
 *.tif
 *.img
 *.bil
