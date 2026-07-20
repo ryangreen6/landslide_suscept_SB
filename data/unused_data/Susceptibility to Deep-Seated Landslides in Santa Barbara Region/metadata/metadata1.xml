@@ -1,0 +1,115 @@
+<?xml version="1.0" ?>
+<metadata>
+	<dataqual>
+		<lineage>
+			<procstep>
+				<procdesc>Consolidated Data Basin Info: Slope Class: A new slope map was generated from a seamless DEM for the entire State of California (USGS 2009 National Elevation Dataset). Ranges of slope values were reclassified into the 8 categories described in CGS Map Sheet 58.
+  
+
+  
+
+Rock Strength: Vector geologic/rock strength data for northern and southern CA were merged into a seamless layer. Some overlapping polygons, determined to be causing issues in the subsequent analyses, were edited to remove overlap. The vector data were dissolved based on the rock strength attibute and then converted to raster format.
+  
+
+  
+
+Existing Landslides: Vector data for existing landslides were converted to raster and reclassified to Landslide Susceptibility Class 10.
+  
+
+  
+
+Landslide Susceptibility: Slope Class and Rock Strength rasters were combined and the resulting raster was reclassified based on the Landslide Susceptibility Classes described in CGS Map Sheet 58. Data from the Existing Landslides raster were merged with the combined Slope Class and Rock Strength raster to produce the final Landslide Susceptibility layer.</procdesc>
+			</procstep>
+		</lineage>
+	</dataqual>
+	<distinfo>
+		<techpreq>Desktop GIS software.</techpreq>
+		<stdorder>
+			<digform>
+				<digtopt>
+					<onlinopt>
+						<computer>
+							<networka>
+								<networkr>https://databasin.org/datasets/5288bd4f9c4d4aa3a59f9cfad936c1d3/</networkr>
+							</networka>
+						</computer>
+						<accinstr>Download from https://databasin.org</accinstr>
+					</onlinopt>
+				</digtopt>
+				<digtinfo>
+					<formvern>ArcGIS 10</formvern>
+					<formspec>Raster Layer</formspec>
+					<formname>Raster Layer</formname>
+					<filedec>No compression applied</filedec>
+				</digtinfo>
+			</digform>
+			<ordering>Download from https://databasin.org</ordering>
+			<fees>None</fees>
+		</stdorder>
+		<distliab>No warranty is made by Data Basin for use of this dataset.  No warranty is made by Data Basin regarding the accuracy, reliability, or completeness of this dataset. In no event shall Data Basin have any liability whatsoever for payment of any consequential, incidental, indirect, special, or tort damages of any kind, including, but not limited to, any loss of profits arising out of the use or reliance on the geographic or attribute data contained within this dataset or arising out of the delivery, installation, operation, or support by Data Basin.</distliab>
+		<distrib>
+			<cntinfo>
+				<cntemail>databasin_admin@consbio.org</cntemail>
+				<cntvoice>541-757-0687</cntvoice>
+				<cntaddr>
+					<country>USA</country>
+					<postal>97333</postal>
+					<state>OR</state>
+					<city>Corvallis</city>
+					<address>136 SW Washington Ave, Suite 202</address>
+					<addrtype>physical address</addrtype>
+				</cntaddr>
+				<cntperp>
+					<cntper>Data Basin Administrator</cntper>
+					<cntorg>Data Basin</cntorg>
+				</cntperp>
+			</cntinfo>
+		</distrib>
+	</distinfo>
+	<idinfo>
+		<keywords>
+			<theme>
+				<themekey>landslide hazard,geoscientificinformation,california,landslide susceptibility,deep-seated landslides</themekey>
+			</theme>
+		</keywords>
+		<timeperd>
+			<timeinfo>
+				<sngdate>
+					<caldate>2009-01-01 - 2011-05-01</caldate>
+				</sngdate>
+			</timeinfo>
+		</timeperd>
+		<useconst>The State of California, the Department of Conservation, and the California Geological Survey make no representations or warranties regarding the accuracy of data or maps. Neither the State nor the Department shall be liable under any circumstances for any direct, special, incidental, or consequential damages with respect to any claim by any user or third party on account of or arising from the use of data or maps. Users should cite the California Geological Survey as the original source of the data, but clearly denote cases where the original data have been updated, modified, or in any way altered from the original condition.</useconst>
+		<spdom>
+			<bounding>
+				<southbc>3948448.6604</southbc>
+				<northbc>4215033.2195</northbc>
+				<eastbc>-13222712.3386</eastbc>
+				<westbc>-13463786.9355</westbc>
+			</bounding>
+		</spdom>
+		<ptcontac>
+			<cntinfo>
+				<cntemail>rghmp@conservation.ca.gov</cntemail>
+				<cntperp>
+					<cntorg>California Geological Survey</cntorg>
+					<cntper>Geologic Mapping Program</cntper>
+				</cntperp>
+			</cntinfo>
+		</ptcontac>
+		<datacred>California Geological Survey</datacred>
+		<descript>
+			<purpose>This map shows the relative likelihood of deep-seated landsliding based on regional estimates of rock strength and steepness of slopes. On the most basic level, weak rocks and steep slopes are most likely to generate landslides. The map uses detailed information on the location of past landslides, the location and relative strength of rock units, and steepness of slope to estimate susceptibility to deep-seated landsliding. This landslide susceptibility map is intended to provide infrastructure owners, emergency planners, and the public with a general overview of where landslides are more likely to occur. It is not appropriate for evaluation of landslide potential at any specific site.</purpose>
+			<abstract>The Susceptibility to Deep-Seated Landslides map covers the entire state of California and was originally published in May of 2011 as CGS Map Sheet 58. It made use of several data layers of varying scales and formats, such as Landslide Inventory, Geology, Rock Strength, and Slope. For the statewide analysis of landslide susceptibility, the methodology of Wilson and Keefer (1985) was used in combining the rock strength and slope data layers as implemented by Ponti, el al. (2008) to create classes of landslide susceptibility (0 to 10, low to high). These classes express the generalization that on very low slopes, landslide susceptibility is low even in weak materials, and that landslide susceptibility increases with slope and in weak rocks. Areas where existing landslides have been mapped were assigned to the highest landslide susceptibility class (i.e. 10). The landslide susceptibility matrix, based on Rock Strength (RS) and Slope Steepness (SS) in degrees, is described below:RS(1) &amp; SS(RS(1) &amp; SS(10 to15) = susceptibility class 3RS(2) &amp; SS(3 to10) = susceptibility class 5RS(1) &amp; SS(15 to 20) – susceptibility class 6RS(1) &amp; SS(20 to 30); RS(3) &amp; SS(3 to 10) = susceptibility class 7RS(1) &amp; SS(30 to &gt;40); RS(2) &amp; SS(10 to 15) = susceptibility class 8RS(2) &amp; SS(15 to &gt;40); RS(3) &amp; SS(10 to 15) = susceptibility class 9RS(3) &amp; SS(15 to &gt;40) = susceptibility class 10  Filename: ms58_ls_susceptibility_20181001_project_clip</abstract>
+		</descript>
+		<citation>
+			<citeinfo>
+				<othercit>Suggested Citation: Wills C.J., Perez, F., Gutierrez, C., 2011, Susceptibility to deep-seated landslides in California: California Geological Survey, Map Sheet 58,  https://www.conservation.ca.gov/cgs/Documents/Publications/Map-Sheets/MS_058.pdf</othercit>
+				<origin>Geologic Mapping Program</origin>
+				<origin>California Geological Survey</origin>
+				<onlink>https://databasin.org/datasets/5288bd4f9c4d4aa3a59f9cfad936c1d3/</onlink>
+				<title>Susceptibility to Deep-Seated Landslides in Santa Barbara Region</title>
+			</citeinfo>
+		</citation>
+	</idinfo>
+</metadata>

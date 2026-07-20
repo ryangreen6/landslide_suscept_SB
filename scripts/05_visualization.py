@@ -159,7 +159,7 @@ def build_interactive_map() -> None:
                 "fillOpacity": 0.65,
             },
             tooltip=folium.GeoJsonTooltip(
-                fields=["susc_label", "probability"],
+                fields=["susc_label", "prob_pct"],
                 aliases=["Susceptibility:", "LR Probability:"],
                 style="font-size:13px;",
             ),
@@ -252,6 +252,30 @@ def build_interactive_map() -> None:
             style_function=lambda _: {"color": "black", "weight": 2, "fillOpacity": 0},
         ).add_to(grp)
         grp.add_to(m)
+
+    if config.ASSESSOR_PARCELS_SHP.exists():
+        import gzip as _gz, base64 as _b64mod
+        ap = gpd.read_file(str(config.ASSESSOR_PARCELS_SHP)).to_crs("EPSG:4326")
+        if _county_wgs84 is not None:
+            ap = gpd.clip(ap, _county_wgs84)
+        ap = ap[ap.geometry.is_valid & ~ap.geometry.is_empty].reset_index(drop=True)
+        from shapely.geometry import Polygon as _APoly, MultiPolygon as _AMPoly
+        def _safe_simplify(geom, tol):
+            s = geom.simplify(tol, preserve_topology=True)
+            if s.is_empty or not s.is_valid:
+                return geom
+            if isinstance(s, _APoly) and len(s.exterior.coords) < 5:
+                return geom
+            if isinstance(s, _AMPoly) and any(len(p.exterior.coords) < 5 for p in s.geoms):
+                return geom
+            return s
+        ap["geometry"] = ap.geometry.apply(lambda g: _safe_simplify(g, 0.0001))
+        ap = ap[ap.geometry.is_valid & ~ap.geometry.is_empty].reset_index(drop=True)
+        _ap_keep = [c for c in ["APN", "Situs1", "LandUse", "Acreage"] if c in ap.columns]
+        _ap_b64 = _b64mod.b64encode(_gz.compress(ap[_ap_keep + ["geometry"]].to_json().encode(), compresslevel=9)).decode()
+        m.get_root().html.add_child(folium.Element(f'<script>var _parcelB64="{_ap_b64}";</script>'))
+        folium.FeatureGroup(name="Assessor Parcels", show=False).add_to(m)
+        logger.info("  Assessor parcels embedded (%d parcels, %.1f MB compressed)", len(ap), len(_ap_b64)*0.75/1e6)
 
     fire_shp = config.PROCESSED_DIR / "fire_perimeters_utm.shp"
     if fire_shp.exists():
@@ -751,12 +775,14 @@ hr { border-color:#555 !important; }
     default_layers_html = """
 <script>
 window.addEventListener('load', function() {
+  var _adminNames = ['SB County Boundary', 'Assessor Parcels'];
   var _riskNames = ['Landslide Risk (Slope Units)'];
   var _defaults = {
     'Landslide Risk (Slope Units)': true,
     'Soil Erodibility': false,
     'Precipitation Intensity': false,
     'SB County Boundary': true,
+    'Assessor Parcels': false,
     'Fire Perimeters (2016\u2013Present)': false,
     'Fault Lines': false,
     'Geology': false,
@@ -798,27 +824,46 @@ window.addEventListener('load', function() {
   var overlaysDiv = ctrl.querySelector('.leaflet-control-layers-overlays');
   if (overlaysDiv) {
     var allLabels = Array.from(overlaysDiv.querySelectorAll('label'));
+    var adminLabels = allLabels.filter(function(l) {
+      var s = l.querySelector('span');
+      return s && _adminNames.indexOf(s.textContent.trim()) >= 0;
+    });
     var riskLabels = allLabels.filter(function(l) {
       var s = l.querySelector('span');
       return s && _riskNames.indexOf(s.textContent.trim()) >= 0;
     });
     var otherLabels = allLabels.filter(function(l) {
       var s = l.querySelector('span');
-      return !s || _riskNames.indexOf(s.textContent.trim()) < 0;
+      if (!s) return true;
+      var t = s.textContent.trim();
+      return _adminNames.indexOf(t) < 0 && _riskNames.indexOf(t) < 0;
     });
 
     overlaysDiv.innerHTML = '';
 
-    var riskHdr = document.createElement('div');
-    riskHdr.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
+    var adminHdr = document.createElement('div');
+    adminHdr.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
       + 'color:#888;margin:2px 0 4px;';
+    adminHdr.textContent = 'Admin Layers';
+    overlaysDiv.appendChild(adminHdr);
+    adminLabels.forEach(function(l) { overlaysDiv.appendChild(l); });
+
+    var dataHdr = document.createElement('div');
+    dataHdr.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
+      + 'color:#888;margin:8px 0 4px;padding-top:8px;border-top:1px solid #555;';
+    dataHdr.textContent = 'Data Layers';
+    overlaysDiv.appendChild(dataHdr);
+
+    var riskHdr = document.createElement('div');
+    riskHdr.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:0.4px;'
+      + 'color:#666;margin:2px 0 3px 2px;';
     riskHdr.textContent = 'Risk Model';
     overlaysDiv.appendChild(riskHdr);
     riskLabels.forEach(function(l) { overlaysDiv.appendChild(l); });
 
     var otherHdr = document.createElement('div');
-    otherHdr.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
-      + 'color:#888;margin:8px 0 4px;padding-top:8px;border-top:1px solid #555;';
+    otherHdr.style.cssText = 'font-size:9px;text-transform:uppercase;letter-spacing:0.4px;'
+      + 'color:#666;margin:6px 0 3px 2px;';
     otherHdr.textContent = 'Other Layers';
     overlaysDiv.appendChild(otherHdr);
     otherLabels.forEach(function(l) { overlaysDiv.appendChild(l); });
@@ -847,11 +892,101 @@ window.addEventListener('load', function() {
     }, 300);
   }
 
+  var sliderWrap = document.createElement('div');
+  sliderWrap.style.cssText = 'padding:8px 6px 2px;border-top:1px solid #555;margin-top:8px;';
+  var sliderLbl = document.createElement('div');
+  sliderLbl.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.6px;'
+    + 'color:#888;margin-bottom:5px;display:flex;justify-content:space-between;';
+  sliderLbl.innerHTML = '<span>Layer Opacity</span><span id="opacity-val">100%</span>';
+  var slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = '0';
+  slider.max = '100';
+  slider.value = '100';
+  slider.style.cssText = 'width:100%;accent-color:#7ab3e0;cursor:pointer;';
+  var _mapObj = null;
+  for (var _k in window) {
+    if (/^map_[a-zA-Z0-9]+$/.test(_k) && window[_k] && typeof window[_k].eachLayer === 'function') {
+      _mapObj = window[_k]; break;
+    }
+  }
+  var _opFactor = 1.0;
+  function _applyOp(layer) {
+    if (layer instanceof L.TileLayer) return;
+    if (layer instanceof L.ImageOverlay) {
+      if (layer._origOp === undefined) layer._origOp = layer.options.opacity !== undefined ? layer.options.opacity : 1;
+      layer.setOpacity(layer._origOp * _opFactor);
+      return;
+    }
+    if (layer instanceof L.Path) {
+      if (layer._origOp === undefined) layer._origOp = layer.options.opacity !== undefined ? layer.options.opacity : 1;
+      if (layer._origFOp === undefined) layer._origFOp = layer.options.fillOpacity !== undefined ? layer.options.fillOpacity : 0;
+      layer.setStyle({opacity: layer._origOp * _opFactor, fillOpacity: layer._origFOp * _opFactor});
+      return;
+    }
+    if (layer.eachLayer) layer.eachLayer(_applyOp);
+  }
+  var _parcelLoaded = false;
+  var _parcelPane = null;
+  if (_mapObj) {
+    _mapObj.on('overlayremove', function(e) {
+      if (e.name === 'Assessor Parcels' && _parcelPane) _parcelPane.style.display = 'none';
+    });
+    _mapObj.on('overlayadd', function(e) {
+      _applyOp(e.layer);
+      if (e.name === 'Assessor Parcels') {
+        if (_parcelLoaded && _parcelPane) { _parcelPane.style.display = ''; return; }
+        if (_parcelLoaded || typeof _parcelB64 === 'undefined') return;
+        _parcelLoaded = true;
+        (async function() {
+          try {
+            var bin = atob(_parcelB64);
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            var ds = new DecompressionStream('gzip');
+            var w = ds.writable.getWriter();
+            w.write(bytes); w.close();
+            var r = ds.readable.getReader();
+            var chunks = [], res;
+            while (!(res = await r.read()).done) chunks.push(res.value);
+            var tot = chunks.reduce(function(a,c){return a+c.length;},0);
+            var all = new Uint8Array(tot), off = 0;
+            chunks.forEach(function(c){all.set(c,off);off+=c.length;});
+            var data = JSON.parse(new TextDecoder().decode(all));
+            _mapObj.createPane('parcelPane');
+            _parcelPane = _mapObj.getPane('parcelPane');
+            _parcelPane.style.zIndex = '400';
+            L.geoJSON(data, {
+              pane: 'parcelPane',
+              style: function() { return {color:'#f0a500',weight:0.8,fillOpacity:0,opacity:1}; },
+              onEachFeature: function(feat, lyr) {
+                var p = feat.properties, lines = [];
+                if (p.APN) lines.push('<b>APN:</b> '+p.APN);
+                if (p.Situs1) lines.push('<b>Address:</b> '+p.Situs1);
+                if (p.LandUse) lines.push('<b>Land Use:</b> '+p.LandUse);
+                if (p.Acreage) lines.push('<b>Acreage:</b> '+parseFloat(p.Acreage).toFixed(2));
+                if (lines.length) lyr.bindTooltip(lines.join('<br>'),{sticky:true});
+              }
+            }).addTo(_mapObj);
+          } catch(err) { console.warn('Parcel load failed:',err); _parcelLoaded=false; }
+        })();
+      }
+    });
+  }
+  slider.addEventListener('input', function() {
+    _opFactor = parseInt(this.value) / 100;
+    document.getElementById('opacity-val').textContent = this.value + '%';
+    if (_mapObj) _mapObj.eachLayer(_applyOp);
+  });
+  sliderWrap.appendChild(sliderLbl);
+  sliderWrap.appendChild(slider);
+  ctrl.appendChild(sliderWrap);
+
   var sep = document.createElement('div');
-  sep.style.cssText = 'border-top:1px solid #555;margin:10px 6px 6px;';
+  sep.style.cssText = 'margin:8px 6px 6px;';
   ctrl.appendChild(sep);
   var btn = document.createElement('button');
-  btn.textContent = 'Clear Layers';
+  btn.textContent = 'Default Layers';
   btn.style.cssText = 'display:block;width:calc(100% - 12px);margin:0 6px 6px;padding:5px 0;'
     + 'background:#3a3a3a;border:1px solid #555;border-radius:4px;cursor:pointer;'
     + 'font-family:Segoe UI,sans-serif;font-size:12px;color:#ddd;';

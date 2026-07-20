@@ -92,6 +92,8 @@ INTERACTIVE_HTML     = OUTPUTS_DIR / "susceptibility_interactive.html"
 SLOPE_UNITS_GPKG        = PROCESSED_DIR / "slope_units.gpkg"
 SLOPE_UNITS_GEOJSON     = OUTPUTS_DIR / "slope_units_classified.geojson"
 SU_LR_COEFFICIENTS_CSV  = OUTPUTS_DIR / "su_lr_coefficients.csv"
+ASSESSOR_PARCELS_SHP    = RAW_DIR / "Assessor_Parcels_Public1_-7380162746328573521" / "Assessors_Parcels_Public.shp"
+ASSESSOR_PARCELS_GEOJSON = OUTPUTS_DIR / "assessor_parcels.geojson"
 
 # ── Susceptibility Class Colors & Labels ──────────────────────────────────────
 SUSCEPTIBILITY_COLORS = {

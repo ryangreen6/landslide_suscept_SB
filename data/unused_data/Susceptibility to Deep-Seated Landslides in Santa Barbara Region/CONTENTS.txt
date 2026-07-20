@@ -1,0 +1,173 @@
+
+# Susceptibility to Deep-Seated Landslides in Santa Barbara Region
+
+
+## URL
+https://databasin.org/datasets/5288bd4f9c4d4aa3a59f9cfad936c1d3/
+
+
+## Dataset Type
+ArcGIS
+
+
+## Credits
+Geologic Mapping Program, California Geological Survey
+
+
+## Uploaded By
+[Conservation Biology Institute](https://databasin.org/people/consbio/)
+
+
+## Description
+The Susceptibility to Deep-Seated Landslides map covers the entire state of California and was originally published in May of 2011 as CGS Map Sheet 58. It made use of several data layers of varying scales and formats, such as Landslide Inventory, Geology, Rock Strength, and Slope. For the statewide analysis of landslide susceptibility, the methodology of Wilson and Keefer (1985) was used in combining the rock strength and slope data layers as implemented by Ponti, el al. (2008) to create classes of landslide susceptibility (0 to 10, low to high). These classes express the generalization that on very low slopes, landslide susceptibility is low even in weak materials, and that landslide susceptibility increases with slope and in weak rocks. Areas where existing landslides have been mapped were assigned to the highest landslide susceptibility class (i.e. 10). The landslide susceptibility matrix, based on Rock Strength (RS) and Slope Steepness (SS) in degrees, is described below:RS(1) &amp; SS(RS(1) &amp; SS(10 to15) = susceptibility class 3RS(2) &amp; SS(3 to10) = susceptibility class 5RS(1) &amp; SS(15 to 20) - susceptibility class 6RS(1) &amp; SS(20 to 30); RS(3) &amp; SS(3 to 10) = susceptibility class 7RS(1) &amp; SS(30 to &gt;40); RS(2) &amp; SS(10 to 15) = susceptibility class 8RS(2) &amp; SS(15 to &gt;40); RS(3) &amp; SS(10 to 15) = susceptibility class 9RS(3) &amp; SS(15 to &gt;40) = susceptibility class 10
+ 
+
+ Filename: ms58_ls_susceptibility_20181001_project_clip
+
+
+## Use Constraints
+The State of California, the Department of Conservation, and the California Geological Survey make no representations or warranties regarding the accuracy of data or maps. Neither the State nor the Department shall be liable under any circumstances for any direct, special, incidental, or consequential damages with respect to any claim by any user or third party on account of or arising from the use of data or maps. Users should cite the California Geological Survey as the original source of the data, but clearly denote cases where the original data have been updated, modified, or in any way altered from the original condition.
+
+
+### Original Metadata
+metadata/metadata1_original.xml
+
+
+### Data Basin Metadata
+metadata/metadata1.xml
+
+
+### Data Files
+data/esriinfo/item.pkinfo
+data/esriinfo/iteminfo.xml
+data/esriinfo/thumbnail/thumbnail.png
+data/v10/0000Susceptibility to Deep-Seated Landslides in Santa Barbara Region.lyr
+data/v10/inputs.gdb/a00000001.gdbindexes
+data/v10/inputs.gdb/a00000001.gdbtable
+data/v10/inputs.gdb/a00000001.gdbtablx
+data/v10/inputs.gdb/a00000001.TablesByName.atx
+data/v10/inputs.gdb/a00000002.gdbtable
+data/v10/inputs.gdb/a00000002.gdbtablx
+data/v10/inputs.gdb/a00000003.gdbindexes
+data/v10/inputs.gdb/a00000003.gdbtable
+data/v10/inputs.gdb/a00000003.gdbtablx
+data/v10/inputs.gdb/a00000004.CatItemsByPhysicalName.atx
+data/v10/inputs.gdb/a00000004.CatItemsByType.atx
+data/v10/inputs.gdb/a00000004.FDO_UUID.atx
+data/v10/inputs.gdb/a00000004.gdbindexes
+data/v10/inputs.gdb/a00000004.gdbtable
+data/v10/inputs.gdb/a00000004.gdbtablx
+data/v10/inputs.gdb/a00000004.spx
+data/v10/inputs.gdb/a00000005.CatItemTypesByName.atx
+data/v10/inputs.gdb/a00000005.CatItemTypesByParentTypeID.atx
+data/v10/inputs.gdb/a00000005.CatItemTypesByUUID.atx
+data/v10/inputs.gdb/a00000005.gdbindexes
+data/v10/inputs.gdb/a00000005.gdbtable
+data/v10/inputs.gdb/a00000005.gdbtablx
+data/v10/inputs.gdb/a00000006.CatRelsByDestinationID.atx
+data/v10/inputs.gdb/a00000006.CatRelsByOriginID.atx
+data/v10/inputs.gdb/a00000006.CatRelsByType.atx
+data/v10/inputs.gdb/a00000006.FDO_UUID.atx
+data/v10/inputs.gdb/a00000006.gdbindexes
+data/v10/inputs.gdb/a00000006.gdbtable
+data/v10/inputs.gdb/a00000006.gdbtablx
+data/v10/inputs.gdb/a00000007.CatRelTypesByBackwardLabel.atx
+data/v10/inputs.gdb/a00000007.CatRelTypesByDestItemTypeID.atx
+data/v10/inputs.gdb/a00000007.CatRelTypesByForwardLabel.atx
+data/v10/inputs.gdb/a00000007.CatRelTypesByName.atx
+data/v10/inputs.gdb/a00000007.CatRelTypesByOriginItemTypeID.atx
+data/v10/inputs.gdb/a00000007.CatRelTypesByUUID.atx
+data/v10/inputs.gdb/a00000007.gdbindexes
+data/v10/inputs.gdb/a00000007.gdbtable
+data/v10/inputs.gdb/a00000007.gdbtablx
+data/v10/inputs.gdb/a00000009.gdbindexes
+data/v10/inputs.gdb/a00000009.gdbtable
+data/v10/inputs.gdb/a00000009.gdbtablx
+data/v10/inputs.gdb/a00000009.spx
+data/v10/inputs.gdb/a0000000a.gdbindexes
+data/v10/inputs.gdb/a0000000a.gdbtable
+data/v10/inputs.gdb/a0000000a.gdbtablx
+data/v10/inputs.gdb/a0000000b.gdbindexes
+data/v10/inputs.gdb/a0000000b.gdbtable
+data/v10/inputs.gdb/a0000000b.gdbtablx
+data/v10/inputs.gdb/a0000000c.band_index.atx
+data/v10/inputs.gdb/a0000000c.blk_key_index.atx
+data/v10/inputs.gdb/a0000000c.col_index.atx
+data/v10/inputs.gdb/a0000000c.gdbindexes
+data/v10/inputs.gdb/a0000000c.gdbtable
+data/v10/inputs.gdb/a0000000c.gdbtablx
+data/v10/inputs.gdb/a0000000c.row_index.atx
+data/v10/inputs.gdb/a0000000d.gdbindexes
+data/v10/inputs.gdb/a0000000d.gdbtable
+data/v10/inputs.gdb/a0000000d.gdbtablx
+data/v10/inputs.gdb/a0000000e.gdbindexes
+data/v10/inputs.gdb/a0000000e.gdbtable
+data/v10/inputs.gdb/a0000000e.gdbtablx
+data/v10/inputs.gdb/gdb
+data/v101/0000Susceptibility to Deep-Seated Landslides in Santa Barbara Region.lyr
+data/v101/inputs.gdb/a00000001.gdbindexes
+data/v101/inputs.gdb/a00000001.gdbtable
+data/v101/inputs.gdb/a00000001.gdbtablx
+data/v101/inputs.gdb/a00000001.TablesByName.atx
+data/v101/inputs.gdb/a00000002.gdbtable
+data/v101/inputs.gdb/a00000002.gdbtablx
+data/v101/inputs.gdb/a00000003.gdbindexes
+data/v101/inputs.gdb/a00000003.gdbtable
+data/v101/inputs.gdb/a00000003.gdbtablx
+data/v101/inputs.gdb/a00000004.CatItemsByPhysicalName.atx
+data/v101/inputs.gdb/a00000004.CatItemsByType.atx
+data/v101/inputs.gdb/a00000004.FDO_UUID.atx
+data/v101/inputs.gdb/a00000004.gdbindexes
+data/v101/inputs.gdb/a00000004.gdbtable
+data/v101/inputs.gdb/a00000004.gdbtablx
+data/v101/inputs.gdb/a00000004.spx
+data/v101/inputs.gdb/a00000005.CatItemTypesByName.atx
+data/v101/inputs.gdb/a00000005.CatItemTypesByParentTypeID.atx
+data/v101/inputs.gdb/a00000005.CatItemTypesByUUID.atx
+data/v101/inputs.gdb/a00000005.gdbindexes
+data/v101/inputs.gdb/a00000005.gdbtable
+data/v101/inputs.gdb/a00000005.gdbtablx
+data/v101/inputs.gdb/a00000006.CatRelsByDestinationID.atx
+data/v101/inputs.gdb/a00000006.CatRelsByOriginID.atx
+data/v101/inputs.gdb/a00000006.CatRelsByType.atx
+data/v101/inputs.gdb/a00000006.FDO_UUID.atx
+data/v101/inputs.gdb/a00000006.gdbindexes
+data/v101/inputs.gdb/a00000006.gdbtable
+data/v101/inputs.gdb/a00000006.gdbtablx
+data/v101/inputs.gdb/a00000007.CatRelTypesByBackwardLabel.atx
+data/v101/inputs.gdb/a00000007.CatRelTypesByDestItemTypeID.atx
+data/v101/inputs.gdb/a00000007.CatRelTypesByForwardLabel.atx
+data/v101/inputs.gdb/a00000007.CatRelTypesByName.atx
+data/v101/inputs.gdb/a00000007.CatRelTypesByOriginItemTypeID.atx
+data/v101/inputs.gdb/a00000007.CatRelTypesByUUID.atx
+data/v101/inputs.gdb/a00000007.gdbindexes
+data/v101/inputs.gdb/a00000007.gdbtable
+data/v101/inputs.gdb/a00000007.gdbtablx
+data/v101/inputs.gdb/a00000009.gdbindexes
+data/v101/inputs.gdb/a00000009.gdbtable
+data/v101/inputs.gdb/a00000009.gdbtablx
+data/v101/inputs.gdb/a00000009.spx
+data/v101/inputs.gdb/a0000000a.gdbindexes
+data/v101/inputs.gdb/a0000000a.gdbtable
+data/v101/inputs.gdb/a0000000a.gdbtablx
+data/v101/inputs.gdb/a0000000b.gdbindexes
+data/v101/inputs.gdb/a0000000b.gdbtable
+data/v101/inputs.gdb/a0000000b.gdbtablx
+data/v101/inputs.gdb/a0000000c.band_index.atx
+data/v101/inputs.gdb/a0000000c.blk_key_index.atx
+data/v101/inputs.gdb/a0000000c.col_index.atx
+data/v101/inputs.gdb/a0000000c.gdbindexes
+data/v101/inputs.gdb/a0000000c.gdbtable
+data/v101/inputs.gdb/a0000000c.gdbtablx
+data/v101/inputs.gdb/a0000000c.row_index.atx
+data/v101/inputs.gdb/a0000000d.gdbindexes
+data/v101/inputs.gdb/a0000000d.gdbtable
+data/v101/inputs.gdb/a0000000d.gdbtablx
+data/v101/inputs.gdb/a0000000e.gdbindexes
+data/v101/inputs.gdb/a0000000e.gdbtable
+data/v101/inputs.gdb/a0000000e.gdbtablx
+data/v101/inputs.gdb/gdb
+
+
+
+
